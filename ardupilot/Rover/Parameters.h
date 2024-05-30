@@ -108,6 +108,7 @@ public:
         k_param_NavEKF2_old,        // deprecated - remove
         k_param_NavEKF2,
         k_param_g2,                 // 2nd block of parameters
+        k_param_g3,                 // 3nd block of parameters 新建立G3参数，2024.05.24 H2Z
         k_param_NavEKF3,
 
         // 140: battery controls
@@ -231,6 +232,7 @@ public:
         // 254,255: reserved
 
         k_param_vehicle = 257, // vehicle common block of parameters
+       
         };
 
     AP_Int16    format_version;
@@ -444,6 +446,49 @@ public:
     AP_Float fs_gcs_timeout;
 
     class ModeCircle mode_circle;
+};
+
+
+
+//新建G3参数库存 2024.05.24 H2Z
+class ParametersG3 {
+public:
+    ParametersG3(void);
+
+    // var_info for holding Parameter information
+    static const struct AP_Param::GroupInfo var_info[];
+
+        //左侧油门pwm限制
+        AP_Int16 velocity_max_1; 
+        AP_Int16 velocity_trim_1;
+        AP_Int16 velocity_min_1;       
+        AP_Int16 velocity_auto_1; //自动
+
+        //右侧油门限制
+        AP_Int16 velocity_max_2;
+        AP_Int16 velocity_trim_2;
+        AP_Int16 velocity_min_2;
+        AP_Int16 velocity_auto_2;//自动
+
+        //前视避障参数
+        AP_Int32 OA_Avoid_ms;
+        AP_Int16 OA_Avoid_sum;
+        AP_Int16 OA_Avoid_en;
+
+        //浅水避障参数
+        AP_Int16 velocity_en;
+        AP_Int16 OA_deep_en;
+        AP_Float OA_deep_m;
+        AP_Int16 OA_deep_sum;
+        AP_Int32 OA_deep_time;
+        AP_Int32 OA_deeps;
+        AP_Float OA_deep_v;
+
+        //手动控制PID参数
+        AP_Float velocity_Kp;
+        AP_Float velocity_Ki;
+        AP_Float velocity_Kd;
+
 };
 
 extern const AP_Param::Info var_info[];

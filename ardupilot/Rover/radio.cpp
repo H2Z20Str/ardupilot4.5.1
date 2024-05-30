@@ -125,6 +125,7 @@ void Rover::rudder_arm_disarm_check()
     }
 }
 
+
 void Rover::read_radio()
 {
     if (!rc().read_input()) {
@@ -139,6 +140,32 @@ void Rover::read_radio()
 
     // check if we try to do RC arm/disarm
     rudder_arm_disarm_check();
+
+     ////south h2z 2023.12.28///
+
+    if (control_mode->mode_number()== Mode::Number::MANUAL) //手动模式
+       {
+           
+           hal.util->ch5_pwm=RC_Channels::rc_channel(CH_5)->get_radio_in(); //读取速度档位     
+            {
+             //   yaw_old=AP::ahrs().yaw_sensor;
+                if(hal.util->ch5_pwm<1200)hal.util->pwm_out1=(int16_t)g3.velocity_min_1,hal.util->pwm_out2=(int16_t)g3.velocity_min_2;
+                else if(hal.util->ch5_pwm<1600)hal.util->pwm_out1=(int16_t)g3.velocity_trim_1,hal.util->pwm_out2=(int16_t)g3.velocity_trim_2;
+                else if(hal.util->ch5_pwm<2000)hal.util->pwm_out1=(int16_t)g3.velocity_max_1,hal.util->pwm_out2=(int16_t)g3.velocity_max_2;
+            }
+       }
+    else  //非手动时的pwm
+        {
+            //2m/s 1800 -1500=300  5m 2100-1500=600
+            if((hal.util->auto_speed*g3.velocity_auto_1+1500)>2100)
+                hal.util->pwm_out1=2100;
+            else hal.util->pwm_out1=hal.util->auto_speed*g3.velocity_auto_1 +1500 ;
+
+            if((hal.util->auto_speed*g3.velocity_auto_2+1500)>2100)
+               hal.util->pwm_out2=2100;
+            else hal.util->pwm_out2=hal.util->auto_speed*g3.velocity_auto_2+1500;
+        }
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "pwm1=%d，pwm2=%d",hal.util->pwm_out1,hal.util->pwm_out2);
 }
 
 void Rover::radio_failsafe_check(uint16_t pwm)

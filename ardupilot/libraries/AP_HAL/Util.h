@@ -54,6 +54,14 @@ public:
         SAFETY_ARMED,
     };
 
+
+
+    //添加一些常用参数
+    int8_t rover_mode=0;
+    int ch5_pwm=0;
+    int pwm_out1=1750,pwm_out2=1750;
+    float auto_speed=1.8;
+
     /*
       persistent data structure. This data is restored on boot if
       there has been a watchdog reset.  The data in this structure
@@ -189,6 +197,8 @@ public:
         return false;
     }
 
+
+
 #if HAL_UART_STATS_ENABLED
     // request information on uart I/O
     virtual void uart_info(ExpandingString &str) {}
@@ -218,4 +228,7 @@ protected:
     // values until the vehicle code has fully started
     bool soft_armed = false;
     uint32_t last_armed_change_ms;
+
+
+
 };

@@ -79,6 +79,7 @@ public:
     friend class GCS_MAVLINK_Rover;
     friend class Parameters;
     friend class ParametersG2;
+    friend class ParametersG3;
     friend class AP_Rally_Rover;
     friend class AP_Arming_Rover;
 #if ADVANCED_FAILSAFE == ENABLED
@@ -114,6 +115,7 @@ public:
 
     Rover(void);
 
+ParametersG3 g3;
 private:
 
     // must be the first AP_Param variable declared to ensure its
@@ -124,6 +126,7 @@ private:
     // all settable parameters
     Parameters g;
     ParametersG2 g2;
+    // ParametersG3 g3;
 
     // mapping between input channels
     RCMapper rcmap;

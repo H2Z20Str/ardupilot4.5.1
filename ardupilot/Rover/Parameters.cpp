@@ -380,6 +380,7 @@ const AP_Param::Info Rover::var_info[] = {
     // @Group:
     // @Path: Parameters.cpp
     GOBJECT(g2, "",  ParametersG2),
+    GOBJECT(g3, "",  ParametersG3),//2023.11.17，添加g3参数类 hzz
 
 #if OSD_ENABLED || OSD_PARAM_ENABLED
     // @Group: OSD
@@ -707,6 +708,55 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 
     AP_GROUPEND
 };
+
+
+/////////////2023.11.16，添加g3参数类//////////////////////////
+const AP_Param::GroupInfo ParametersG3::var_info[] = {
+
+     AP_GROUPINFO("OA_DEEP_EN", 1, ParametersG3, OA_deep_en, 0),//浅水开关，1为开，0为关
+     AP_GROUPINFO("OA_DEEP_M", 2, ParametersG3, OA_deep_m, 0.6),//避障值，单位m，低于该值触发浅水避障
+     AP_GROUPINFO("OA_DEEP_sum", 3, ParametersG3, OA_deep_sum, 25),//报警次数
+     AP_GROUPINFO("OA_DEEP_TIME", 4, ParametersG3, OA_deep_time, 3000),//清零时间
+     AP_GROUPINFO("OA_DEEP_SLEEP", 5, ParametersG3, OA_deeps, 30),//浅水报警间隔
+
+     AP_GROUPINFO("VEL_Kp", 6, ParametersG3, velocity_Kp, 1.0),
+     AP_GROUPINFO("VEL_Ki", 7, ParametersG3, velocity_Ki, 0.2),
+     AP_GROUPINFO("VEL_Kd", 8, ParametersG3, velocity_Kd, 0.0),
+
+     AP_GROUPINFO("OA_DEEP_V", 9, ParametersG3, OA_deep_v, 1.0),
+
+     AP_GROUPINFO("OA_VEL_EN", 10, ParametersG3, velocity_en, 4),//切换水深滤波
+
+    AP_GROUPINFO("VEL_MAX_1", 11, ParametersG3, velocity_max_1, 1980),//最大速度6m/s
+    AP_GROUPINFO("VEL_TRIM_1", 12, ParametersG3, velocity_trim_1, 1880),//中速4m/s
+    AP_GROUPINFO("VEL_MIN_1", 13, ParametersG3, velocity_min_1, 1780),//低速2m/s
+
+    
+
+    AP_GROUPINFO("VEL_AUTO_1", 14, ParametersG3, velocity_auto_1, 148),//切换速度控制通道，0是SW1,1是AUX1
+
+    AP_GROUPINFO("VEL_MAX_2", 15, ParametersG3, velocity_max_2, 1980),//最大速度6m/s
+    AP_GROUPINFO("VEL_TRIM_2", 16, ParametersG3, velocity_trim_2, 1880),//中速4m/s
+    AP_GROUPINFO("VEL_MIN_2", 17, ParametersG3, velocity_min_2, 1780),//低速2m/s
+    
+    AP_GROUPINFO("VEL_AUTO_2", 18, ParametersG3, velocity_auto_2, 148),//切换速度控制通道，0是SW1,1是AUX1
+
+
+    AP_GROUPINFO("OA_Avoid_ms", 19, ParametersG3, OA_Avoid_ms, 10000),//避障间隔
+    AP_GROUPINFO("OA_Avoid_sum", 20, ParametersG3, OA_Avoid_sum, 50),//避障次数
+    AP_GROUPINFO("OA_Avoid_EN", 21, ParametersG3, OA_Avoid_en, 0),//避障开关，1为开，0为关
+
+
+    AP_GROUPEND
+
+};
+ParametersG3::ParametersG3(void)
+{
+    AP_Param::setup_object_defaults(this, var_info);
+}
+////////////////////////////////////////////
+
+
 
 // These auxiliary channel param descriptions are here so that users of beta Mission Planner (which uses the master branch as its source of descriptions)
 // can get them.  These lines can be removed once Rover-3.6-beta testing begins or we improve the source of descriptions for GCSs.

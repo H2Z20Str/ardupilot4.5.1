@@ -151,6 +151,8 @@ void AR_WPNav::update(float dt)
         return;
     }
 
+    hal.util->auto_speed =_speed_max+0.2;//获取设定的速度
+    
     // if no recent calls initialise desired_speed_limited to current speed
     if (!is_active()) {
         _desired_speed_limited = speed;

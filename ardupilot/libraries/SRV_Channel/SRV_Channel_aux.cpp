@@ -21,6 +21,7 @@
 #include <AP_HAL/AP_HAL.h>
 #include <RC_Channel/RC_Channel.h>
 #include <GCS_MAVLink/GCS.h>
+#include <../Rover/Rover.h>
 
 #if NUM_SERVO_CHANNELS == 0
 #pragma GCC diagnostic ignored "-Wtype-limits"
@@ -231,6 +232,7 @@ void SRV_Channels::update_aux_servo_function(void)
     initialised = true;
 }
 
+
 /// Should be called after the servo functions have been initialized
 /// called at 1Hz
 void SRV_Channels::enable_aux_servos()
@@ -239,11 +241,18 @@ void SRV_Channels::enable_aux_servos()
 
     update_aux_servo_function();
 
+        
     // enable all channels that are set to a valid function. This
     // includes k_none servos, which allows those to get their initial
     // trim value on startup
     for (uint8_t i = 0; i < NUM_SERVO_CHANNELS; i++) {
         SRV_Channel &c = channels[i];
+
+
+        if(i==0)c.servo_max.set(hal.util->pwm_out1);
+        else if(i==1)c.servo_max.set(hal.util->pwm_out2);
+
+
         // see if it is a valid function
         if (c.valid_function() && !(disabled_mask & (1U<<c.ch_num))) {
             hal.rcout->enable_ch(c.ch_num);
