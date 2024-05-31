@@ -115,7 +115,7 @@ public:
 
     Rover(void);
 
-ParametersG3 g3;
+
 private:
 
     // must be the first AP_Param variable declared to ensure its
@@ -126,7 +126,7 @@ private:
     // all settable parameters
     Parameters g;
     ParametersG2 g2;
-    // ParametersG3 g3;
+    ParametersG3 g3;
 
     // mapping between input channels
     RCMapper rcmap;

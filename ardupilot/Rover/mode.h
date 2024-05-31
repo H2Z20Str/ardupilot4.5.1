@@ -199,6 +199,7 @@ protected:
     class AP_AHRS &ahrs;
     class Parameters &g;
     class ParametersG2 &g2;
+
     class RC_Channel *&channel_steer;
     class RC_Channel *&channel_throttle;
     class RC_Channel *&channel_lateral;
@@ -659,6 +660,8 @@ public:
     // manual mode does not require position or velocity estimate
     bool requires_position() const override { return false; }
     bool requires_velocity() const override { return false; }
+
+    float PID_realize(PID *pid, float speed);//PID 控制 2024.05.30 hzz
 
 protected:
 

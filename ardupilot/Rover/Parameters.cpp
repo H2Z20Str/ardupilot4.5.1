@@ -706,6 +706,12 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Path: mode_circle.cpp
     AP_SUBGROUPINFO(mode_circle, "CIRC", 57, ParametersG2, ModeCircle),
 
+
+
+    AP_GROUPINFO("VEL_Kp", 58, ParametersG2, velocity_Kp, 1.0),
+    AP_GROUPINFO("VEL_Ki", 59, ParametersG2, velocity_Ki, 0.2),
+    AP_GROUPINFO("VEL_Kd", 60, ParametersG2, velocity_Kd, 0.0),
+
     AP_GROUPEND
 };
 
@@ -719,32 +725,29 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
      AP_GROUPINFO("OA_DEEP_TIME", 4, ParametersG3, OA_deep_time, 3000),//清零时间
      AP_GROUPINFO("OA_DEEP_SLEEP", 5, ParametersG3, OA_deeps, 30),//浅水报警间隔
 
-     AP_GROUPINFO("VEL_Kp", 6, ParametersG3, velocity_Kp, 1.0),
-     AP_GROUPINFO("VEL_Ki", 7, ParametersG3, velocity_Ki, 0.2),
-     AP_GROUPINFO("VEL_Kd", 8, ParametersG3, velocity_Kd, 0.0),
 
-     AP_GROUPINFO("OA_DEEP_V", 9, ParametersG3, OA_deep_v, 1.0),
+     AP_GROUPINFO("OA_DEEP_V", 6, ParametersG3, OA_deep_v, 1.0),
 
-     AP_GROUPINFO("OA_VEL_EN", 10, ParametersG3, velocity_en, 4),//切换水深滤波
+     AP_GROUPINFO("OA_VEL_EN", 7, ParametersG3, velocity_en, 4),//切换水深滤波
 
-    AP_GROUPINFO("VEL_MAX_1", 11, ParametersG3, velocity_max_1, 1980),//最大速度6m/s
-    AP_GROUPINFO("VEL_TRIM_1", 12, ParametersG3, velocity_trim_1, 1880),//中速4m/s
-    AP_GROUPINFO("VEL_MIN_1", 13, ParametersG3, velocity_min_1, 1780),//低速2m/s
+    AP_GROUPINFO("VEL_MAX_1", 8, ParametersG3, velocity_max_1, 1980),//最大速度6m/s
+    AP_GROUPINFO("VEL_TRIM_1", 9, ParametersG3, velocity_trim_1, 1880),//中速4m/s
+    AP_GROUPINFO("VEL_MIN_1", 10, ParametersG3, velocity_min_1, 1780),//低速2m/s
 
     
 
-    AP_GROUPINFO("VEL_AUTO_1", 14, ParametersG3, velocity_auto_1, 148),//切换速度控制通道，0是SW1,1是AUX1
+    AP_GROUPINFO("VEL_AUTO_1", 11, ParametersG3, velocity_auto_1, 148),//切换速度控制通道，0是SW1,1是AUX1
 
-    AP_GROUPINFO("VEL_MAX_2", 15, ParametersG3, velocity_max_2, 1980),//最大速度6m/s
-    AP_GROUPINFO("VEL_TRIM_2", 16, ParametersG3, velocity_trim_2, 1880),//中速4m/s
-    AP_GROUPINFO("VEL_MIN_2", 17, ParametersG3, velocity_min_2, 1780),//低速2m/s
+    AP_GROUPINFO("VEL_MAX_2", 12, ParametersG3, velocity_max_2, 1980),//最大速度6m/s
+    AP_GROUPINFO("VEL_TRIM_2", 13, ParametersG3, velocity_trim_2, 1880),//中速4m/s
+    AP_GROUPINFO("VEL_MIN_2", 14, ParametersG3, velocity_min_2, 1780),//低速2m/s
     
-    AP_GROUPINFO("VEL_AUTO_2", 18, ParametersG3, velocity_auto_2, 148),//切换速度控制通道，0是SW1,1是AUX1
+    AP_GROUPINFO("VEL_AUTO_2", 15, ParametersG3, velocity_auto_2, 148),//切换速度控制通道，0是SW1,1是AUX1
 
 
-    AP_GROUPINFO("OA_Avoid_ms", 19, ParametersG3, OA_Avoid_ms, 10000),//避障间隔
-    AP_GROUPINFO("OA_Avoid_sum", 20, ParametersG3, OA_Avoid_sum, 50),//避障次数
-    AP_GROUPINFO("OA_Avoid_EN", 21, ParametersG3, OA_Avoid_en, 0),//避障开关，1为开，0为关
+    AP_GROUPINFO("OA_Avoid_ms", 16, ParametersG3, OA_Avoid_ms, 10000),//避障间隔
+    AP_GROUPINFO("OA_Avoid_sum", 17, ParametersG3, OA_Avoid_sum, 50),//避障次数
+    AP_GROUPINFO("OA_Avoid_EN", 18, ParametersG3, OA_Avoid_en, 0),//避障开关，1为开，0为关
 
 
     AP_GROUPEND

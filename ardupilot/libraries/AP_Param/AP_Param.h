@@ -1050,6 +1050,20 @@ AP_PARAMDEF(int32_t, Int32, AP_PARAM_INT32);  // defines AP_Int32
 // _pt is the enum ap_var_type type
 #define AP_PARAMDEFV(_t, _suffix, _pt)   typedef AP_ParamV<_t, _pt> AP_ ## _suffix;
 
+
+
+// 定义PID结构体 2024.05.30
+typedef struct {
+    float SetSpeed= 0.0;; // 设定速度
+    float ActualSpeed= 0.0;; // 实际速度
+    float err= 0.0;; // 当前误差
+    float err_last= 0.0;; // 上一次误差
+    float err_next= 0.0;; // 下一次误差
+    float Kp= 1.0, Ki= 0.0, Kd= 0.0; // PID参数
+} PID;
+
+
+
 /*
   template class for enum types based on AP_Int8
  */

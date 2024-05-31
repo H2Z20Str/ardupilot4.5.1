@@ -446,6 +446,12 @@ public:
     AP_Float fs_gcs_timeout;
 
     class ModeCircle mode_circle;
+
+    //手动控制PID参数
+    AP_Float velocity_Kp;
+    AP_Float velocity_Ki;
+    AP_Float velocity_Kd;
+
 };
 
 
@@ -484,10 +490,7 @@ public:
         AP_Int32 OA_deeps;
         AP_Float OA_deep_v;
 
-        //手动控制PID参数
-        AP_Float velocity_Kp;
-        AP_Float velocity_Ki;
-        AP_Float velocity_Kd;
+
 
 };
 

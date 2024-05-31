@@ -6,6 +6,23 @@ void ModeManual::_exit()
     g2.motors.set_lateral(0);
 }
 
+
+// PID控制算法实现 2024.05.30
+float ModeManual::PID_realize(PID *pid, float speed) {
+    pid->SetSpeed=0.001;
+    pid->ActualSpeed = speed;
+    pid->err = pid->SetSpeed - pid->ActualSpeed;
+    float incrementSpeed = pid->Kp * (pid->err - pid->err_next) + pid->Ki * pid->err + pid->Kd * (pid->err - 2 * pid->err_next + pid->err_last);
+    pid->ActualSpeed += incrementSpeed;
+    pid->err_last = pid->err_next;
+    pid->err_next = pid->err;
+    return pid->ActualSpeed;
+}
+
+PID pid;
+int32_t yaw_old=0;
+//class ParametersG3 g3;
+
 void ModeManual::update()
 {
     float desired_steering, desired_throttle, desired_lateral;
@@ -41,4 +58,38 @@ void ModeManual::update()
     g2.motors.set_throttle(desired_throttle);
     g2.motors.set_steering(desired_steering, (g2.manual_options & ManualOptions::SPEED_SCALING));
     g2.motors.set_lateral(desired_lateral);
+
+    //手动下直线校准程序 2024.05.30 hzz
+    int ch6_pwm=RC_Channels::rc_channel(CH_6)->get_radio_in(); //读方向遥杆
+    if(ch6_pwm>=1800)
+    {
+        if(desired_throttle>0)
+        {
+            int yaw_change=0;
+            pid.Kp = g2.velocity_Kp;
+            pid.Ki = g2.velocity_Ki;
+            pid.Kd = g2.velocity_Kd;
+            if((int)desired_steering==0)
+                {
+                    if(yaw_old<9000 && AP::ahrs().yaw_sensor>27000)
+                    {
+                        yaw_change=AP::ahrs().yaw_sensor-yaw_old-36000;
+                    }
+                    else if(yaw_old>27000 && AP::ahrs().yaw_sensor<9000)
+                    {
+                        yaw_change=AP::ahrs().yaw_sensor-yaw_old+36000;
+                    }
+                    else yaw_change=AP::ahrs().yaw_sensor-yaw_old;//角度变化值
+
+                    float st=0-yaw_change/10000.0;
+                    st = PID_realize(&pid, st);
+ //                   gcs().send_text(MAV_SEVERITY_CRITICAL, " 22 yaw_change=%d,st=%f",yaw_change,st);
+                    calc_steering_from_turn_rate(st);
+
+                }
+            else yaw_old=AP::ahrs().yaw_sensor;
+        }
+        else yaw_old=AP::ahrs().yaw_sensor;
+    }
+    else yaw_old=AP::ahrs().yaw_sensor;
 }
