@@ -299,6 +299,11 @@ private:
     void one_second_loop(void);
     void update_current_mode(void);
 
+
+    //2024.05.31 hzz
+    void south_data(void);// HZZ
+
+
     // balance_bot.cpp
     void balancebot_pitch_control(float &throttle);
     bool is_balancebot() const;

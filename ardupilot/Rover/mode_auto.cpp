@@ -641,11 +641,28 @@ void ModeAuto::exit_mission()
     start_stop();
 }
 
+
+char south_wp_radius=0;
+int wp_sum=0;
+
 // verify_command_callback - callback function called from ap-mission at 10hz or higher when a command is being run
 //      we double check that the flight mode is AUTO to avoid the possibility of ap-mission triggering actions while we're not in AUTO mode
 bool ModeAuto::verify_command_callback(const AP_Mission::Mission_Command& cmd)
 {
     const bool cmd_complete = verify_command(cmd);
+    AP_Mission::Mission_Command next_cmd;
+
+     wp_sum=cmd.index;
+
+
+     if (!mission.get_next_nav_cmd(cmd.index+1, next_cmd)) //判断是否是最后一个点 h2z 2023.8.25
+     {
+         south_wp_radius=1;
+
+     }
+     else south_wp_radius=0;
+
+
 
     // send message to GCS
     if (cmd_complete) {

@@ -65,9 +65,9 @@ void AR_WPNav_OA::update(float dt)
 
         case AP_OAPathPlanner::OA_NOT_REQUIRED:
             if (_oa_active) {
-                // object avoidance has become inactive so reset target to original destination
+                // object avoidance has become inactive so reset target to original destination 目标回避已变为非活动状态，因此将目标重置为原始目的地
                 if (!AR_WPNav::set_desired_location(_destination_oabak)) {
-                    // this should never happen because we should have an EKF origin and the destination must be valid
+                    // this should never happen because we should have an EKF origin and the destination must be valid 这种情况永远不应该发生，因为我们应该有一个EKF来源，并且目的地必须是有效的
                     INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
                     stop_vehicle = true;
                 }

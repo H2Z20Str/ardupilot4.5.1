@@ -34,7 +34,7 @@ public:
 
     // get navigation outputs for speed (in m/s) and turn rate (in rad/sec)
     float get_speed() const { return _desired_speed_limited; }
-    float get_turn_rate_rads() const { return _desired_turn_rate_rads; }
+    float get_turn_rate_rads() const { return _desired_turn_rate_rads; } //转向率
 
     // get desired lateral acceleration (for reporting purposes only because will be zero during pivot turns)
     float get_lat_accel() const { return _desired_lat_accel; }

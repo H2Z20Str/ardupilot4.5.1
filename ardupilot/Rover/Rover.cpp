@@ -37,6 +37,8 @@
 
 #include "AP_Gripper/AP_Gripper.h"
 
+#include <stdlib.h>
+
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
 #define SCHED_TASK(func, _interval_ticks, _max_time_micros, _priority) SCHED_TASK_CLASS(Rover, &rover, func, _interval_ticks, _max_time_micros, _priority)
@@ -143,6 +145,9 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
 #if ADVANCED_FAILSAFE == ENABLED
     SCHED_TASK(afs_fs_check,           10,    200, 129),
 #endif
+
+    SCHED_TASK(south_data,            10,    100, 132), //数据更新 10HZ 100us延时
+
 };
 
 
@@ -312,6 +317,28 @@ void Rover::stats_update(void)
     g2.stats.update();
 }
 #endif
+
+
+void Rover::south_data(void)
+{
+
+    hal.util->mr72_switch=g3.OA_Avoid_en; //获取避障开关
+
+//    if(hal.util->water_deep_n>15)//@SIC,,GET,DATA.DEEP,OK,水深数据*CRC\r\n
+//    {
+//        hal.util->water_deep_n=0;
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "aa %s",hal.util->water_deep);
+//        memset(hal.util->water_deep,'\0',40);
+//    }
+//
+//    if(hal.util->mr72_sum2==20)
+//    {
+//        hal.util->mr72_sum2=0;
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "bb %s",hal.util->mr72_buff2);
+//        memset(hal.util->mr72_buff2,'\0',20);
+//    }
+
+}
 
 
 // update AHRS system

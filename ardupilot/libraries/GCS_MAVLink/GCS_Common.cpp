@@ -1766,6 +1766,9 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
     handle_message(msg);
 }
 
+
+uint8_t c_old=0,water_flag=0,mr72_flag=0;
+
 void
 GCS_MAVLINK::update_receive(uint32_t max_time_us)
 {
@@ -1787,7 +1790,49 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
     {
         const uint8_t c = (uint8_t)_port->read();
         const uint32_t protocol_timeout = 4000;
-        
+
+        //截取并解析数据
+        if(c=='H'&& c_old=='T') //mr72 数据
+        {
+            hal.util->mr72_sum2=1;
+            mr72_flag=1;
+            hal.util->mr72_buff2[0]=c_old;
+            hal.util->mr72_buff2[1]=c;
+        }
+        if(mr72_flag==1)
+        {
+            hal.util->mr72_buff2[hal.util->mr72_sum2++]=c;
+
+            if((c_old=='\r'&&c=='\n')||hal.util->mr72_sum2>=20)
+            {
+                mr72_flag=0; //结束接收
+            }
+        }
+
+        //水深数据
+        if(c=='S'&& c_old=='@') //@SIC,,GET,DATA.DEEP,OK,水深数据*CRC\r\n
+        {
+            water_flag=1;//标志可以接收
+            hal.util->water_deep_n=1;
+            hal.util->water_deep[0]=c_old;
+            hal.util->water_deep[1]=c;
+        }
+        if(water_flag==1)
+        {
+            hal.util->water_deep[hal.util->water_deep_n++]=c;
+            if((c_old=='\r'&&c=='\n')||hal.util->water_deep_n>=40)
+            {
+                water_flag=0;//结束接收
+            }
+        }
+        c_old=c; //上一个获取的字符
+
+
+
+
+
+
+
         if (alternative.handler &&
             now_ms - alternative.last_mavlink_ms > protocol_timeout) {
             /*

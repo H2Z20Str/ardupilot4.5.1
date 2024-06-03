@@ -61,6 +61,15 @@ public:
     int ch5_pwm=0;
     int pwm_out1=1750,pwm_out2=1750;
     float auto_speed=1.8;
+    //避障雷达数据
+    uint8_t mr72_buff2[20];
+    uint8_t mr72_sum2;
+    uint16_t mr72_switch;
+    //水深数据
+    uint8_t water_deep[40];
+    uint8_t water_deep_n=0;
+
+
 
     /*
       persistent data structure. This data is restored on boot if

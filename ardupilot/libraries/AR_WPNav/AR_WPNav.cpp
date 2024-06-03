@@ -154,9 +154,17 @@ void AR_WPNav::update(float dt)
     hal.util->auto_speed =_speed_max+0.2;//获取设定的速度
     
     // if no recent calls initialise desired_speed_limited to current speed
+    //如果最近没有调用，则初始化desired_speed_limited到当前速度
     if (!is_active()) {
         _desired_speed_limited = speed;
     }
+
+
+
+//    if (_oa_active||bizhang_sum!=0)_desired_speed_limited=(_speed_max<1?_speed_max:0.8);//避障减速
+//    if(deep_sleep_flag==1) _desired_speed_limited=(_speed_max<DEEP_V?_speed_max:DEEP_V);//浅水避障减速
+//
+
     _last_update_ms = AP_HAL::millis();
 
     update_distance_and_bearing_to_destination();
@@ -401,6 +409,9 @@ bool AR_WPNav::is_active() const
     return ((AP_HAL::millis() - _last_update_ms) < AR_WPNAV_TIMEOUT_MS);
 }
 
+
+extern char south_wp_radius;
+extern int wp_sum;
 // move target location along track from origin to destination using SCurves navigation
 void AR_WPNav::advance_wp_target_along_track(const Location &current_loc, float dt)
 {
@@ -450,14 +461,22 @@ void AR_WPNav::advance_wp_target_along_track(const Location &current_loc, float 
     Vector2p target_pos_ptype{target_pos_3d_ftype.x, target_pos_3d_ftype.y};
     _pos_control.set_pos_vel_accel_target(target_pos_ptype, target_vel.xy(), target_accel.xy());
 
-    // check if we've reached the waypoint
+
+ //浅水避障
+
+//    if(wp_sum==3)
+//        wp_sum=0, _reached_destination=true;
+
+    // check if we've reached the waypoint 检查我们是否已到达航路点
     if (!_reached_destination && s_finished) {
         // "fast" waypoints are complete once the intermediate point reaches the destination
         if (_fast_waypoint) {
             _reached_destination = true;
         } else {
             // regular waypoints also require the vehicle to be within the waypoint radius or past the "finish line"
-            const bool near_wp = current_loc.get_distance(_destination) <= _radius;
+            bool near_wp = current_loc.get_distance(_destination) <= _radius;
+            if(south_wp_radius)near_wp =current_loc.get_distance(_destination)<= 0.2; //h2z 2023.8.25，最后一个点的距离
+
             const bool past_wp = current_loc.past_interval_finish_line(_origin, _destination);
             _reached_destination = near_wp || past_wp;
         }
@@ -515,15 +534,35 @@ void AR_WPNav::update_steering_and_speed(const Location &current_loc, float dt)
     // handle pivot turns
     if (_pivot.active()) {
         // decelerate to zero
-        _desired_speed_limited = _atc.get_desired_speed_accel_limited(0.0f, dt);
+ //       _desired_speed_limited = _atc.get_desired_speed_accel_limited(0.0f, dt);
+
+        //
+        if(_distance_to_destination<=(3+2*_speed_max))//减速带
+           {
+               _desired_speed_limited=(_speed_max<0.6?_speed_max:0.6);
+           }
+           else _desired_speed_limited=_speed_max+0.2;
+
         _desired_heading_cd = _reversed ? wrap_360_cd(oa_wp_bearing_cd() + 18000) : oa_wp_bearing_cd();
         _desired_turn_rate_rads = is_zero(_desired_speed_limited) ? _pivot.get_turn_rate_rads(_desired_heading_cd * 0.01, dt) : 0;
         _desired_lat_accel = 0.0f;
     } else {
-        _desired_speed_limited = _pos_control.get_desired_speed();
+        //自动速度控制 _desired_speed_limited  bool set_speed_max(float speed_max);
+        //靠近航点减速
+        if(_distance_to_destination<=(3+2*_speed_max))//减速带
+           {
+               _desired_speed_limited=(_speed_max<0.8?_speed_max:0.8);
+           }
+           else _desired_speed_limited=_speed_max+0.2;
+
+      //  _desired_speed_limited = _pos_control.get_desired_speed();
         _desired_turn_rate_rads = _pos_control.get_desired_turn_rate_rads();
         _desired_lat_accel = _pos_control.get_desired_lat_accel();
     }
+
+
+
+
 }
 
 // settor to allow vehicle code to provide turn related param values to this library (should be updated regularly)
