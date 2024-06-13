@@ -94,7 +94,7 @@ AR_WPNav::AR_WPNav(AR_AttitudeControl& atc, AR_PosControl &pos_control) :
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
-
+float speed_old=0;
 // initialise waypoint controller.  speed_max should be set to the maximum speed in m/s (or left at zero to use the default speed)
 void AR_WPNav::init(float speed_max)
 {
@@ -103,6 +103,7 @@ void AR_WPNav::init(float speed_max)
         _base_speed_max = speed_max;
     } else {
         _base_speed_max = _speed_max;
+        speed_old=_speed_max;
     }
     _base_speed_max = MAX(AR_WPNAV_SPEED_MIN, _base_speed_max);
     float atc_accel_max = MIN(_atc.get_accel_max(), _atc.get_decel_max());
@@ -137,6 +138,7 @@ void AR_WPNav::init(float speed_max)
     set_nudge_speed_max(0);
 }
 
+
 // update navigation
 void AR_WPNav::update(float dt)
 {
@@ -153,6 +155,16 @@ void AR_WPNav::update(float dt)
 
     hal.util->auto_speed =_speed_max+0.2;//获取设定的速度
     
+//    if(fabs(_speed_max-speed_old) > 1e-6)
+//    {
+//        speed_old=_speed_max;
+//        _base_speed_max=_speed_max;
+//    }
+
+    if(hal.util->hzz_test[2]==1 && hal.util->hzz_test[0]==2 )
+       if(hal.util->deep_sleep_flag==1) _base_speed_max=(_speed_max<hal.util->DEEP_V?_speed_max:hal.util->DEEP_V);//浅水避障减速
+    if(hal.util->hzz_test[1]==1 && hal.util->hzz_test[0]==1 )
+        if (hal.util->bizhang_sum!=0)_base_speed_max=(_speed_max<1?_speed_max:1);//避障减速
     // if no recent calls initialise desired_speed_limited to current speed
     //如果最近没有调用，则初始化desired_speed_limited到当前速度
     if (!is_active()) {
@@ -411,7 +423,8 @@ bool AR_WPNav::is_active() const
 
 
 extern char south_wp_radius;
-extern int wp_sum;
+int32_t time_ms_old=0;
+//extern int wp_sum;
 // move target location along track from origin to destination using SCurves navigation
 void AR_WPNav::advance_wp_target_along_track(const Location &current_loc, float dt)
 {
@@ -463,20 +476,58 @@ void AR_WPNav::advance_wp_target_along_track(const Location &current_loc, float 
 
 
  //浅水避障
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "_base_speed_max=%fd",_base_speed_max);
+//
+//    if(wp_sum>3)_base_speed_max=5;
+    if(hal.util->hzz_test[2]==1)
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "deep_sum=%d",hal.util->deep_sum);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "11 bizhang_sum=%d",hal.util->bizhang_sum);
+    if(hal.util->deep_sum>=hal.util->OA_deep_sum)//水深
+    {
+        hal.util->deep_sum=0;
+        hal.util->deep_fllag=1;
+        _reached_destination = true;
+    }
+
+    //前视避障
+    const int32_t ms_now = AP_HAL::millis();
+     if(hal.util->bizhang_sum==hal.util->bizhang_sum_old)//如果计数相等，判断计时
+     {
+         if(ms_now-time_ms_old>=hal.util->OA_ms)//计数超过OA_ms时间，则清零，重新计数
+         {
+             hal.util->bizhang_sum=0;
+         }
+     }
+     else //计数不相等，重新
+     {
+         time_ms_old=ms_now;//更新计时
+         hal.util->bizhang_sum_old=hal.util->bizhang_sum;//更新计数
+     }
+
+     if(hal.util->bizhang_sum>hal.util->OA_sum)//避障次数大于设定值，则跳点
+     {
+         hal.util->bizhang_sum=0;
+  //       wp_Aviod_fllag=1;
+         _reached_destination = true;
+     }
 
 //    if(wp_sum==3)
 //        wp_sum=0, _reached_destination=true;
-
+     if(hal.util->hzz_test[5]==1)
+         gcs().send_text(MAV_SEVERITY_CRITICAL, "s_finished =%d ",s_finished);
     // check if we've reached the waypoint 检查我们是否已到达航路点
-    if (!_reached_destination && s_finished) {
+ //   if (!_reached_destination && s_finished)
+    {
         // "fast" waypoints are complete once the intermediate point reaches the destination
-        if (_fast_waypoint) {
-            _reached_destination = true;
-        } else {
+        {
+//        if (_fast_waypoint) {
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "_reached_destination = true");
+//            _reached_destination = true;
+//        } else {
             // regular waypoints also require the vehicle to be within the waypoint radius or past the "finish line"
             bool near_wp = current_loc.get_distance(_destination) <= _radius;
-            if(south_wp_radius)near_wp =current_loc.get_distance(_destination)<= 0.2; //h2z 2023.8.25，最后一个点的距离
-
+            if(south_wp_radius)near_wp =current_loc.get_distance(_destination)<= 0.9; //h2z 2023.8.25，最后一个点的距离
+        //    gcs().send_text(MAV_SEVERITY_CRITICAL, "south_wp_radius =%d,%f m,_radius=%f ",south_wp_radius,current_loc.get_distance(_destination),_radius);
             const bool past_wp = current_loc.past_interval_finish_line(_origin, _destination);
             _reached_destination = near_wp || past_wp;
         }
@@ -505,6 +556,7 @@ void AR_WPNav::update_psc_input_shaping(float dt)
         Vector2p pos_target_diff = pos_target - _pos_control.get_pos_target();
         // vehicle has reached destination when the target is within 1cm of the destination and vehicle is within waypoint radius
         _reached_destination = (pos_target_diff.length_squared() < sq(0.01)) && (_pos_control.get_pos_error().length_squared() < sq(_radius));
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "_reached_destination=%d",_reached_destination); guided模式进入到这里
     }
 }
 
@@ -534,14 +586,7 @@ void AR_WPNav::update_steering_and_speed(const Location &current_loc, float dt)
     // handle pivot turns
     if (_pivot.active()) {
         // decelerate to zero
- //       _desired_speed_limited = _atc.get_desired_speed_accel_limited(0.0f, dt);
-
-        //
-        if(_distance_to_destination<=(3+2*_speed_max))//减速带
-           {
-               _desired_speed_limited=(_speed_max<0.6?_speed_max:0.6);
-           }
-           else _desired_speed_limited=_speed_max+0.2;
+        _desired_speed_limited = _atc.get_desired_speed_accel_limited(0.0f, dt);
 
         _desired_heading_cd = _reversed ? wrap_360_cd(oa_wp_bearing_cd() + 18000) : oa_wp_bearing_cd();
         _desired_turn_rate_rads = is_zero(_desired_speed_limited) ? _pivot.get_turn_rate_rads(_desired_heading_cd * 0.01, dt) : 0;
@@ -549,13 +594,19 @@ void AR_WPNav::update_steering_and_speed(const Location &current_loc, float dt)
     } else {
         //自动速度控制 _desired_speed_limited  bool set_speed_max(float speed_max);
         //靠近航点减速
-        if(_distance_to_destination<=(3+2*_speed_max))//减速带
+        if(hal.util->hzz_test[0]==1)
+        {
+          if(_distance_to_destination<=(2+2*_speed_max))//减速带
            {
-               _desired_speed_limited=(_speed_max<0.8?_speed_max:0.8);
+             _base_speed_max=(_speed_max<1.3?_speed_max:1.3);
            }
-           else _desired_speed_limited=_speed_max+0.2;
+           else _base_speed_max=_speed_max;
 
-      //  _desired_speed_limited = _pos_control.get_desired_speed();
+           if(hal.util->deep_sleep_flag==1) _base_speed_max=(_speed_max<hal.util->DEEP_V?_speed_max:hal.util->DEEP_V);//浅水避障减速
+           if (hal.util->bizhang_sum!=0)_base_speed_max=(_speed_max<1.2?_speed_max:1.2);//避障减速
+        }
+
+        _desired_speed_limited = _pos_control.get_desired_speed();
         _desired_turn_rate_rads = _pos_control.get_desired_turn_rate_rads();
         _desired_lat_accel = _pos_control.get_desired_lat_accel();
     }

@@ -749,6 +749,8 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
     AP_GROUPINFO("OA_Avoid_sum", 17, ParametersG3, OA_Avoid_sum, 50),//避障次数
     AP_GROUPINFO("OA_Avoid_EN", 18, ParametersG3, OA_Avoid_en, 0),//避障开关，1为开，0为关
 
+    AP_GROUPINFO("HZZ_test", 19, ParametersG3, hzz_test, 0),
+
 
     AP_GROUPEND
 

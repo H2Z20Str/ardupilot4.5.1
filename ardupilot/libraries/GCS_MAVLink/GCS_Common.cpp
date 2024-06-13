@@ -251,7 +251,7 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
 
     const AP_BattMonitor &battery = AP::battery();
     float temp;
-    bool got_temperature = battery.get_temperature(temp, instance);
+    //bool got_temperature = battery.get_temperature(temp, instance);
 
     // prepare arrays of individual cell voltages
     uint16_t cell_mvolts[MAVLINK_MSG_BATTERY_STATUS_FIELD_VOLTAGES_LEN];
@@ -327,7 +327,7 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
     }
 
     float current, consumed_mah, consumed_wh;
-    const int8_t percentage = battery_remaining_pct(instance);
+   // const int8_t percentage = battery_remaining_pct(instance);
     
     if (battery.current_amps(current, instance)) {
          current = constrain_float(current * 100,-INT16_MAX,INT16_MAX);
@@ -346,22 +346,34 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
     if (!battery.time_remaining(time_remaining, instance)) {
         time_remaining = 0;
     }
+    //电池数据
+    temp=hal.util->battery_temp;
+    cell_mvolts[0]=hal.util->battery_voltage*1000;
+    cell_mvolts[1]=hal.util->deep_mav_L*1000;
+    cell_mvolts[2]=hal.util->deep_mav_H*1000;
+    current=hal.util->battery_current*100;
+    int8_t percentage = hal.util->battery_remaining;
+
+//    hal.util->deep_mav_L=0;
+//    hal.util->deep_mav_H=0;
 
     mavlink_msg_battery_status_send(chan,
                                     instance, // id
                                     MAV_BATTERY_FUNCTION_UNKNOWN, // function
                                     MAV_BATTERY_TYPE_UNKNOWN, // type
-                                    got_temperature ? ((int16_t) (temp * 100)) : INT16_MAX, // temperature. INT16_MAX if unknown
+                                    ((int16_t) (temp * 100)),//got_temperature ? ((int16_t) (temp * 100)) : INT16_MAX, // temperature. INT16_MAX if unknown
                                     cell_mvolts, // cell voltages
                                     current,      // current in centiampere
                                     consumed_mah, // total consumed current in milliampere.hour
                                     consumed_wh,  // consumed energy in hJ (hecto-Joules)
-                                    constrain_int16(percentage, -1, 100),
+                                    constrain_int16(percentage, -1, 100),//
                                     time_remaining, // time remaining, seconds
                                     battery.get_mavlink_charge_state(instance), // battery charge state
                                     cell_mvolts_ext, // Cell 11..14 voltages
                                     0, // battery mode
                                     battery.get_mavlink_fault_bitmask(instance));   // fault_bitmask
+
+
 }
 
 // returns true if all battery instances were reported
@@ -1768,6 +1780,7 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
 
 
 uint8_t c_old=0,water_flag=0,mr72_flag=0;
+uint8_t water_n=0,mr72_n=0;
 
 void
 GCS_MAVLINK::update_receive(uint32_t max_time_us)
@@ -1794,34 +1807,39 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
         //截取并解析数据
         if(c=='H'&& c_old=='T') //mr72 数据
         {
-            hal.util->mr72_sum2=1;
+           // hal.util->mr72_sum2=1;
+            mr72_n=1;
             mr72_flag=1;
             hal.util->mr72_buff2[0]=c_old;
             hal.util->mr72_buff2[1]=c;
         }
         if(mr72_flag==1)
         {
-            hal.util->mr72_buff2[hal.util->mr72_sum2++]=c;
-
-            if((c_old=='\r'&&c=='\n')||hal.util->mr72_sum2>=20)
+          //  hal.util->mr72_buff2[hal.util->mr72_sum2++]=c;
+            hal.util->mr72_buff2[mr72_n++]=c;
+            if((c_old=='\r'&&c=='\n')||mr72_n>=20)
             {
+                hal.util->mr72_sum2=mr72_n;
                 mr72_flag=0; //结束接收
             }
         }
 
-        //水深数据
+        //水深数据+电池数据
         if(c=='S'&& c_old=='@') //@SIC,,GET,DATA.DEEP,OK,水深数据*CRC\r\n
         {
             water_flag=1;//标志可以接收
-            hal.util->water_deep_n=1;
+           // hal.util->water_deep_n=1;
+            water_n=1;
             hal.util->water_deep[0]=c_old;
             hal.util->water_deep[1]=c;
         }
         if(water_flag==1)
         {
-            hal.util->water_deep[hal.util->water_deep_n++]=c;
-            if((c_old=='\r'&&c=='\n')||hal.util->water_deep_n>=40)
+            //hal.util->water_deep[hal.util->water_deep_n++]=c;
+            hal.util->water_deep[water_n++]=c;
+            if((c_old=='\r'&&c=='\n')||hal.util->water_deep_n>=50)
             {
+                hal.util->water_deep_n=water_n;
                 water_flag=0;//结束接收
             }
         }
@@ -5477,7 +5495,7 @@ void GCS_MAVLINK::send_sys_status()
 #if AP_BATTERY_ENABLED
     const AP_BattMonitor &battery = AP::battery();
     float battery_current;
-    const int8_t battery_remaining = battery_remaining_pct(AP_BATT_PRIMARY_INSTANCE);
+  //  const int8_t battery_remaining = battery_remaining_pct(AP_BATT_PRIMARY_INSTANCE);
 
     if (battery.healthy() && battery.current_amps(battery_current)) {
         battery_current = constrain_float(battery_current * 100,-INT16_MAX,INT16_MAX);
@@ -5497,6 +5515,9 @@ void GCS_MAVLINK::send_sys_status()
     const uint16_t errors2 = (errors>>16) & 0xffff;
     const uint16_t errors4 = AP::internalerror().count() & 0xffff;
 
+    battery_current = hal.util->battery_current*100;
+   // battery_remaining=75;
+
     mavlink_msg_sys_status_send(
         chan,
         control_sensors_present,
@@ -5504,9 +5525,9 @@ void GCS_MAVLINK::send_sys_status()
         control_sensors_health,
         static_cast<uint16_t>(AP::scheduler().load_average() * 1000),
 #if AP_BATTERY_ENABLED
-        battery.gcs_voltage() * 1000,  // mV
+        hal.util->battery_voltage*1000,//battery.gcs_voltage() * 1000,  // mV
         battery_current,        // in 10mA units
-        battery_remaining,      // in %
+        hal.util->battery_remaining,//battery_remaining,      // in %
 #else
         0,
         -1,

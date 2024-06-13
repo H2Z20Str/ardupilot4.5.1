@@ -644,7 +644,7 @@ void ModeAuto::exit_mission()
 
 char south_wp_radius=0;
 int wp_sum=0;
-
+unsigned char str[]={0x54,0x48,0x0D,0xAD,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x1F,0x0F,0x0C,0x0F,0x5C,0xF4,0x34,0x01};
 // verify_command_callback - callback function called from ap-mission at 10hz or higher when a command is being run
 //      we double check that the flight mode is AUTO to avoid the possibility of ap-mission triggering actions while we're not in AUTO mode
 bool ModeAuto::verify_command_callback(const AP_Mission::Mission_Command& cmd)
@@ -654,6 +654,11 @@ bool ModeAuto::verify_command_callback(const AP_Mission::Mission_Command& cmd)
 
      wp_sum=cmd.index;
 
+     if(wp_sum==6 || wp_sum==8)
+     {
+         strcat((char*)hal.util->mr72_buff2,(const char*)str);
+         hal.util->mr72_sum2=20;
+     }
 
      if (!mission.get_next_nav_cmd(cmd.index+1, next_cmd)) //判断是否是最后一个点 h2z 2023.8.25
      {

@@ -55,6 +55,9 @@ void AP_BattMonitor_Torqeedo::read(void)
         _state.healthy = true;
     }
 
+//    _state.voltage = 12.6;
+//    _state.current_amps = 6.2;
+//    _state.temperature = 65;
     // read battery pack capacity
     if (!have_capacity) {
         uint16_t batt_capacity_ah;

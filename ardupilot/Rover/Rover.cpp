@@ -37,6 +37,7 @@
 
 #include "AP_Gripper/AP_Gripper.h"
 
+#include "AP_Filesystem/posix_compat.h"
 #include <stdlib.h>
 
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
@@ -146,7 +147,7 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
     SCHED_TASK(afs_fs_check,           10,    200, 129),
 #endif
 
-    SCHED_TASK(south_data,            10,    100, 132), //数据更新 10HZ 100us延时
+    SCHED_TASK(south_data,            20,    100, 132), //数据更新 10HZ 100us延时
 
 };
 
@@ -318,11 +319,581 @@ void Rover::stats_update(void)
 }
 #endif
 
+#define buf_deep_sum 20
+float buf_deeps_1[buf_deep_sum],buf_deeps_2[buf_deep_sum],buf_deeps_3[buf_deep_sum],buf_deeps_4[buf_deep_sum],buf_deeps_5[buf_deep_sum];
+uint8_t  buf_i_1=0,buf_i_2=0,buf_i_3=0,buf_i_4=0,buf_i_5=0;
+float deep_water_1=0,deep_water_2=0,deep_water_3=0,deep_water_4=0,deep_water_5=0,deep_start=0;
 
+float buf_Regression[buf_deep_sum];
+uint8_t  buf_i=0,buf_Regression_i=0;
+float buf_deeps[buf_deep_sum];
+uint8_t deep_sum_old=0;
+float deep_old=0;
+int32_t ms_old=0,deep_time=0;
+
+//1. 结构体类型定义
+typedef struct
+{
+    float LastP;//上次估算协方差 初始化值为0.02
+    float Now_P;//当前估算协方差 初始化值为0
+    float out;//卡尔曼滤波器输出 初始化值为0
+    float Kg;//卡尔曼增益 初始化值为0
+    float Q;//过程噪声协方差 初始化值为0.001,增大，动态响应变快，收敛稳定性变坏
+    float R;//观测噪声协方差 初始化值为0.543,增大，动态响应变慢，收敛稳定性变好
+}KFP;//Kalman Filter parameter
+
+//2. 以高度为例 定义卡尔曼结构体并初始化参数
+KFP KFP_height={0.02,0,0,0,0.001,0.543};
+KFP KFP_height2={0.02,0,0,0,0.001,0.243};
+
+int old=0;
 void Rover::south_data(void)
 {
 
     hal.util->mr72_switch=g3.OA_Avoid_en; //获取避障开关
+    hal.util->OA_ms=g3.OA_Avoid_ms;
+    hal.util->OA_sum=g3.OA_Avoid_sum;
+
+
+
+    int32_t ms_now = AP_HAL::millis();//获取现在的时间
+    hal.util->OA_deep_sum=g3.OA_deep_sum;
+
+      float k=0;
+      int len=0;
+      unsigned char voltage[10];
+      unsigned char current[10];
+      unsigned char remaining[10];
+      unsigned char temp[10];
+      char  bat_error=0;
+
+      hal.util->hzz_test[0]= g3.hzz_test;
+
+      //解析测试参数
+      char test_hzz[13];
+      sprintf((char *)test_hzz,"%d",(int)g3.hzz_test);
+      int h_len=strlen(test_hzz)-1;
+      int ha_len=0;
+       if(h_len<10)
+          for(;h_len>=0;h_len--)
+           {
+              hal.util->hzz_test[ha_len++]=test_hzz[h_len]-'0';
+           }
+
+       if(old!=g3.hzz_test) //参数更新后
+       {
+           old=g3.hzz_test;
+           gcs().send_text(MAV_SEVERITY_CRITICAL, "len=%d,%s",ha_len,test_hzz);
+           for(int j=0;j<ha_len;j++)
+           {
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "hzz_test[%d]=%d",j,hal.util->hzz_test[j]);
+           }
+       }
+
+
+      hal.util->DEEP_V= g3.OA_deep_v;
+     // gcs().send_text(MAV_SEVERITY_CRITICAL, "%d，%d，%d",si,deep_sum,deep_sum_old);
+      if(hal.util->water_deep_n>15)//@SIC,,GET,DATA.DEEP,OK,水深数据*CRC\r\n
+      {
+
+          //电池数据 "@SIC,,bat,%d,temp,%f,vol,%f,ele,%f\r\n"
+          if(strncmp((char*)hal.util->water_deep,"@SIC,,bat,",strlen("@SIC,,bat,"))==0)//解析电池数据
+          {
+           //   gcs().send_text(MAV_SEVERITY_CRITICAL,"%s",hal.util->water_deep);
+             len=strlen("@SIC,,bat,");
+             unsigned char n=0;
+             while(hal.util->water_deep[len]!=',')  //电量数据
+             {
+                 if(hal.util->water_deep[len]=='\r'||n>=5)
+                  {
+                     bat_error=1;//标记解析出错
+                     break;
+                   }
+                 remaining[n++]=hal.util->water_deep[len++];
+              }
+              remaining[n]='\0';
+              if(strncmp((char*)&hal.util->water_deep[len],",temp,",strlen(",temp,"))==0) //温度数据
+              {
+                 len=len + strlen(",temp,");
+                 n=0;
+                  while(hal.util->water_deep[len]!=',')
+                 {
+                     if(hal.util->water_deep[len]=='\r'||n>=5)
+                      {
+                         bat_error=1;//标记解析出错
+                         break;
+                     }
+                     temp[n++]=hal.util->water_deep[len++];
+                 }
+                 temp[n]='\0';
+               }
+
+             if(strncmp((char*)&hal.util->water_deep[len],",vol,",strlen(",vol,"))==0) //电压
+              {
+                 len=len + strlen(",vol,");
+                 n=0;
+                  while(hal.util->water_deep[len]!=',')
+                 {
+                     if(hal.util->water_deep[len]=='\r'||n>=5)
+                      {
+                         bat_error=1;//标记解析出错
+                         break;
+                     }
+                     voltage[n++]=hal.util->water_deep[len++];
+                 }
+                 voltage[n]='\0';
+               }
+
+             if(strncmp((char*)&hal.util->water_deep[len],",ele,",strlen(",ele,"))==0) //电流
+              {
+                 len=len + strlen(",ele,");
+                 n=0;
+                  while(hal.util->water_deep[len]!='\r')
+                 {
+                     if(hal.util->water_deep[len]=='\0'||n>=5)
+                      {
+                         bat_error=1;//标记解析出错
+                         break;
+                     }
+                     current[n++]=hal.util->water_deep[len++];
+                 }
+                 current[n]='\0';
+               }
+
+             hal.util->water_deep_n=0;
+             memset(hal.util->water_deep,'\0',50);
+
+           //  gcs().send_text(MAV_SEVERITY_CRITICAL, "remaining=%s! temp=%s,voltage=%s,current=%s\n",remaining,temp,voltage,current);
+
+             if(bat_error==0)
+              {
+                 hal.util->battery_remaining=(uint8_t)(atof((const char*)remaining)/10);
+                 hal.util->battery_temp=atof((const char*)temp);
+                 hal.util->battery_voltage=atof((const char*)voltage);
+                 hal.util->battery_current=atof((const char*)current);
+              //   gcs().send_text(MAV_SEVERITY_CRITICAL, "%d,%.2f,%.2f,%.2f\r\n",hal.util->battery_remaining,hal.util->battery_temp,hal.util->battery_voltage,hal.util->battery_current);
+              }
+
+          }
+          //水深数据
+         else if(strncmp((char*)hal.util->water_deep,"@SIC,,GET,DATA.DEEP,OK,",strlen("@SIC,,GET,DATA.DEEP,OK,"))==0)//水深正确
+         {
+         //    gcs().send_text(MAV_SEVERITY_CRITICAL,"%s",hal.util->water_deep);
+             //解析水深数据
+             uint8_t n=strlen("@SIC,,GET,DATA.DEEP,OK,"),s=0;
+             char deep[20];
+             char deep_H[10];uint8_t H=0,flag_H=0;
+             while(hal.util->water_deep[n]!='*')
+             {
+                 if(hal.util->water_deep[n]=='\r'||s>=20)break;
+
+                 if(hal.util->water_deep[n]=='|')
+                   {
+                       flag_H=1;
+                   }
+
+                 if(flag_H==0) //低频水深
+                 {
+                     deep[s++]=hal.util->water_deep[n++];
+                 }
+                 else  //高频水深
+                  {
+                     deep_H[H++]=hal.util->water_deep[n++];
+                   }
+             }
+
+             deep[s]='\0';
+             deep_H[H]='\0';
+             deep_H[0]='0';
+             float deep_water=atof(deep);
+             float deep_water_H=atof(deep_H);
+
+             hal.util->deep_mav_L=deep_water;
+             hal.util->deep_mav_H=deep_water_H;
+
+             if(deep_water>0.1)
+           {
+             //    gcs().send_text(MAV_SEVERITY_CRITICAL, "deep_water=%.2f,deep_water_H=%.2f",deep_water,deep_water_H);
+             deep_start=deep_water;
+             //1、中位值递推平均滤波：取一组数据，去除最大最小值再算平均值
+
+             if(buf_i_1==buf_deep_sum)//已获取N个数据，实现滤波
+             {
+                 int i=0;
+                 for(i=0;i<buf_deep_sum-1;i++)//循环更新最新的5个数据
+                 {
+                     buf_deeps_1[i] = buf_deeps_1[i+1];
+                 }
+                 buf_deeps_1[i]=deep_water;//更新最新的水深数据
+
+
+                 //求平均值滤波
+                 float sum=0,max=0,min=0;
+                 for(i=0;i<buf_deep_sum;i++)
+                     {
+                         sum +=buf_deeps_1[i];
+                         if(max<buf_deeps_1[i])max=buf_deeps_1[i];
+                         if(min>buf_deeps_1[i])min=buf_deeps_1[i];
+                     }
+                 //gcs().send_text(MAV_SEVERITY_CRITICAL, "buf_deeps[%d]=%f",i,buf_deeps[i]);;
+                 deep_water_1=(sum-max-min)/(buf_deep_sum);
+             }
+             if(buf_i_1<buf_deep_sum-2) //初始先获取N个数据
+                 buf_deeps_1[buf_i_1++]=deep_water;
+
+
+             //2、限幅递推平均值滤波：每次采集到的数据比上一次数据的差值超过限值，采用上一次的数据，然后再算平均值
+             if(buf_i_2==buf_deep_sum)//已获取N个数据，实现滤波
+             {
+                 int i=0;
+                 static uint8_t AS=0;
+                 for(i=0;i<buf_deep_sum-1;i++)//循环更新最新的5个数据
+                 {
+                     buf_deeps_2[i] = buf_deeps_2[i+1];
+                 }
+                 //限幅
+                 if(abs(deep_water-buf_deeps_2[i-1])<0.5)
+                 {
+                     buf_deeps_2[i]=deep_water;//更新最新的水深数据
+
+                 }
+                 else
+                 {
+                     buf_deeps_2[i]=buf_deeps_2[i-1];//采用上一次水深
+                     if(++AS>5)
+                      {
+                          AS=0;
+                          buf_deeps_2[i]=deep_water;//更新最新的水深数据
+                      }
+                 }
+
+
+                 //求平均值滤波
+                 float sum=0,max=0,min=0;
+                 for(i=0;i<buf_deep_sum;i++)
+                     {
+                         sum +=buf_deeps_2[i];
+                         if(max<buf_deeps_2[i])max=buf_deeps_2[i];
+                         if(min>buf_deeps_2[i])min=buf_deeps_2[i];
+                     }
+                 //gcs().send_text(MAV_SEVERITY_CRITICAL, "buf_deeps[%d]=%f",i,buf_deeps[i]);;
+                 deep_water_2=(sum-max-min)/(buf_deep_sum-2);
+             }
+             if(buf_i_2<buf_deep_sum) //初始先获取N个数据
+                 buf_deeps_2[buf_i_2++]=deep_water;
+
+
+
+             //3、加权递推平均值滤波：不同时刻的数据加以不同的权，越接近现时刻的数据，权取得越大。
+             if(buf_i_3==buf_deep_sum)//已获取N个数据，实现滤波
+             {
+                 int i=0;
+                 static uint8_t AS=0;
+                 for(i=0;i<buf_deep_sum-1;i++)//循环更新最新的N个数据
+                 {
+                     buf_deeps_3[i] = buf_deeps_3[i+1];
+                 }
+                 //限幅
+                 if(abs(deep_water-buf_deeps_2[i-1])<0.5)
+                 {
+                     buf_deeps_3[i]=deep_water;//更新最新的水深数据
+                 }
+                 else
+                 {
+                     buf_deeps_3[i]=buf_deeps_3[i-1];//采用上一次水深
+                     if(++AS>5)
+                      {
+                          AS=0;
+                          buf_deeps_3[i]=deep_water;//更新最新的水深数据
+                      }
+                 }
+
+
+                 //求平均值滤波
+                 float sum=0,max=0,min=0,sum_i=0,max_i=0,min_i=0;
+                 for(i=0;i<buf_deep_sum;i++)
+                     {
+                         sum +=buf_deeps_3[i]*(i+1);
+                         sum_i +=(i+1);
+                         if(max<buf_deeps_3[i])max=buf_deeps_3[i]*(i+1),max_i=(i+1);
+                         if(min>buf_deeps_3[i])min=buf_deeps_3[i]*(i+1),min_i=(i+1);
+                     }
+                 //gcs().send_text(MAV_SEVERITY_CRITICAL, "buf_deeps[%d]=%f",i,buf_deeps[i]);;
+                 deep_water_3=(sum-max-min)/(sum_i-max_i-min_i);
+             }
+             if(buf_i_3<buf_deep_sum) //初始先获取N个数据
+                 buf_deeps_3[buf_i_3++]=deep_water;
+
+        //4、卡尔曼滤波：
+             KFP_height.Now_P = KFP_height.LastP + KFP_height.Q;
+             //卡尔曼增益方程：卡尔曼增益 = k时刻系统估算协方差 / （k时刻系统估算协方差 + 观测噪声协方差）
+             KFP_height.Kg = KFP_height.Now_P / (KFP_height.Now_P + KFP_height.R);
+             //更新最优值方程：k时刻状态变量的最优值 = 状态变量的预测值 + 卡尔曼增益 * （测量值 - 状态变量的预测值）
+             KFP_height.out = KFP_height.out + KFP_height.Kg * (deep_water -KFP_height.out);//因为这一次的预测值就是上一次的输出值
+             //更新协方差方程: 本次的系统协方差付给 kfp->LastP 威下一次运算准备。
+             KFP_height.LastP = (1-KFP_height.Kg) * KFP_height.Now_P;
+             deep_water_4= KFP_height.out;
+
+
+             //5、限幅+平均值+卡尔曼
+             if(buf_i_5==buf_deep_sum)//已获取N个数据，实现滤波
+              {
+                  int i=0;
+                  static uint8_t AS2=0;
+                  for(i=0;i<buf_deep_sum-1;i++)//循环更新最新的5个数据
+                  {
+                      buf_deeps_5[i] = buf_deeps_5[i+1];
+                  }
+                  //限幅
+                  if(abs(deep_water-buf_deeps_5[i-1])<0.5)
+                  {
+                      buf_deeps_5[i]=deep_water;//更新最新的水深数据
+
+                  }
+                  else
+                  {
+                      buf_deeps_5[i]=buf_deeps_5[i-1];//采用上一次水深
+                      if(++AS2>5)
+                       {
+                           AS2=0;
+                           buf_deeps_5[i]=deep_water;//更新最新的水深数据
+                       }
+                  }
+
+
+                  //求平均值滤波
+                  float sum=0,WATER=0;
+                  for(i=0;i<buf_deep_sum;i++)
+                      {
+                          sum +=buf_deeps_5[i];
+                      }
+                  //gcs().send_text(MAV_SEVERITY_CRITICAL, "buf_deeps[%d]=%f",i,buf_deeps[i]);;
+                  WATER=(sum)/(buf_deep_sum);
+
+
+                  //卡尔曼滤波：
+                  KFP_height2.Now_P = KFP_height2.LastP + KFP_height2.Q;
+                  //卡尔曼增益方程：卡尔曼增益 = k时刻系统估算协方差 / （k时刻系统估算协方差 + 观测噪声协方差）
+                  KFP_height2.Kg = KFP_height2.Now_P / (KFP_height2.Now_P + KFP_height2.R);
+                  //更新最优值方程：k时刻状态变量的最优值 = 状态变量的预测值 + 卡尔曼增益 * （测量值 - 状态变量的预测值）
+                  KFP_height2.out = KFP_height2.out + KFP_height2.Kg * (WATER -KFP_height2.out);//因为这一次的预测值就是上一次的输出值
+                  //更新协方差方程: 本次的系统协方差付给 kfp->LastP 威下一次运算准备。
+                  KFP_height2.LastP = (1-KFP_height2.Kg) * KFP_height2.Now_P;
+                  deep_water_5= KFP_height2.out;
+
+              }
+              if(buf_i_5<buf_deep_sum) //初始先获取N个数据
+                  buf_deeps_5[buf_i_5++]=deep_water;
+
+
+
+
+             //平均值滤波
+             if(buf_i==buf_deep_sum)//已获取5个数据，实现滤波
+             {
+                 int i=0;
+                 for(i=0;i<buf_deep_sum-1;i++)//循环更新最新的5个数据
+                 {
+                     buf_deeps[i] = buf_deeps[i+1];
+                 }
+                 buf_deeps[i]=deep_water;//更新最新的水深数据
+
+                 //求平均值滤波
+                 float sum=0;
+                 for(i=0;i<buf_deep_sum;i++) sum +=buf_deeps[i];//gcs().send_text(MAV_SEVERITY_CRITICAL, "buf_deeps[%d]=%f",i,buf_deeps[i]);;
+                 deep_water=sum/buf_deep_sum;
+             }
+             if(buf_i<buf_deep_sum) //初始先获取5个数据
+                 buf_deeps[buf_i++]=deep_water;
+
+
+
+
+             //计算水深回归直线
+
+
+  //           if(buf_Regression_i==buf_deep_sum)
+  //           {
+  //               int i;
+  //               float sum=0;
+  //               for(i=0;i<buf_deep_sum-1;i++)//循环更新最新的5个数据
+  //               {
+  //                   buf_Regression[i] = buf_Regression[i+1];
+  //               }
+  //               buf_Regression[i]=deep_water;//更新最新的水深数据
+  //
+  //               for(i=0;i<buf_deep_sum;i++) sum +=buf_Regression[i];
+  //
+  //               float _x=0,_y=0,sum_a=0,sum_b=0;//y是水深，x是时间刻度（n个水深）
+  //
+  //
+  //               _x=((1+buf_deep_sum)/2.0);//等距队列，1,2,3,平均数
+  //               _y=sum/buf_deep_sum; //水深平均数
+  //               for(i=1;i<=buf_deep_sum;i++)//i=x
+  //               {
+  //                   sum_a +=(i-_x)*(buf_deeps[i-1]-_y);
+  //
+  //                   sum_b +=(i-_x)*(i-_x);
+  //               }
+  //               k=sum_a/sum_b; //K>0,正相关，
+  ////                  gcs().send_text(MAV_SEVERITY_CRITICAL, "sum_a=%f，sum_b=%f, k=%f",sum_a,sum_b,k);
+  //
+  //           }
+             //char flag=0;
+  //           gcs().send_text(MAV_SEVERITY_CRITICAL, "buf_Regression_i=%d",buf_Regression_i);
+
+          if(hal.util->deep_sum>0) //需要浅水避障时才启动
+          {
+             if(buf_Regression_i<buf_deep_sum-5) //求回归直线数组
+             {
+                 switch(g3.velocity_en)
+                 {
+                     case 1:buf_Regression[buf_Regression_i]=deep_water_1;break;
+                     case 2:buf_Regression[buf_Regression_i]=deep_water_2;break;
+                     case 3:buf_Regression[buf_Regression_i]=deep_water_3;break;
+                     case 4:buf_Regression[buf_Regression_i]=deep_water_4;break;
+                     case 5:buf_Regression[buf_Regression_i]=deep_water_5;break;
+                     case 6:buf_Regression[buf_Regression_i]=deep_water;break;
+                 }
+
+                 buf_Regression_i++;
+             }
+             if(buf_Regression_i>=buf_deep_sum-5)
+             {
+                 float _x=0,_y=0,sum_a=0,sum_b=0;//y是水深，x是时间刻度（n个水深）
+                 int i;
+                 float sum=0;
+                 for(i=0;i<buf_deep_sum-5;i++)
+                     sum +=buf_Regression[i];//
+
+                  _x=((1+buf_deep_sum-5)/2.0);//等距队列，1,2,3,平均数
+                  _y=sum/buf_deep_sum-5; //水深平均数
+                  for(i=1;i<=buf_deep_sum-5;i++)//i=x
+                  {
+                      sum_a +=(i-_x)*(buf_deeps[i-1]-_y);
+
+                      sum_b +=(i-_x)*(i-_x);
+                  }
+                  k=sum_a/sum_b; //K>0,正相关，
+             }
+
+          }
+          else buf_Regression_i=0;
+
+
+
+            hal.util->deep_log=deep_water;
+
+            if(deep_water>0.1&&g3.OA_deep_en!=0) //浅水避障
+             {
+
+               {
+                if(g3.OA_deep_en!=0 && deep_water<= g3.OA_deep_m && hal.util->deep_fllag==0)
+                {
+                    hal.util->deep_sum++;
+                    hal.util->deep_sleep_flag=1;
+
+                }
+                else hal.util->deep_sum=0,hal.util->deep_sleep_flag=0;
+                if(g3.velocity_en==10) //测试
+                {
+                    if(deep_water>=deep_old && hal.util->deep_sum>=g3.velocity_en) hal.util->deep_sum=hal.util->deep_sum-g3.velocity_en/5;//船往深水走，降低避障值 逻辑需要更改
+                }
+                else
+                {
+                    if(buf_Regression_i>=buf_deep_sum-5)
+                    {
+                        buf_Regression_i=0;
+                        if(k>=0)
+                        {
+
+                            hal.util->deep_sum=0; //相关系数大于0，水深增加，船往深水区域走
+                            gcs().send_text(MAV_SEVERITY_CRITICAL, "往深水区走");
+                        }
+                    }
+                }
+               }
+               if (control_mode->mode_number()== Mode::Number::MANUAL) hal.util->deep_sum=0;//手动模式不触发
+               if (control_mode->mode_number()== Mode::Number::LOITER) hal.util->deep_sum=0;//悬停模式不触发
+             }
+            else hal.util->deep_sum=0;
+  //         gcs().send_text(MAV_SEVERITY_CRITICAL, "k=%f,sum=%d",k,deep_sum);
+  //          gcs().send_text(MAV_SEVERITY_CRITICAL, "deep_water_1=%f,deep_water_2=%f,deep_water_3=%f,deep_water_4=%f",deep_water_1,deep_water_2,deep_water_3,deep_water_4);
+            deep_old=deep_water;
+            deep_water=0;//水深清零
+
+   //    if (should_log(MASK_LOG_SPOS))//写入日志
+//            {
+//                Log_Write_SPOS();
+//                Log_Write_south((const char *)water_deep);
+//            }
+
+           }
+             memset(hal.util->water_deep,'\0',40);
+         }
+          hal.util->water_deep_n=0;
+          memset(hal.util->water_deep,'\0',50);
+      }
+
+      //浅水避障
+      if(hal.util->deep_fllag==1)
+      {
+
+          deep_time=ms_now;
+          hal.util->deep_fllag=3;
+      }
+      else if(hal.util->deep_fllag==3&&(ms_now-deep_time>=(g3.OA_deeps)))//触发避障后多久内不再触发,单位ms
+      {
+          hal.util->deep_fllag=0;
+      }
+  //    gcs().send_text(MAV_SEVERITY_CRITICAL, "time=%ld",ms_now-ms_old);
+  //    gcs().send_text(MAV_SEVERITY_CRITICAL, "deep_sum_old=%d",deep_sum_old);
+      if(hal.util->deep_sum==deep_sum_old)//超过3s不更新全部清零
+      {
+          if(ms_now-ms_old>=g3.OA_deep_time)
+          {
+              hal.util->deep_sum=0;
+          }
+      }
+      else
+      {
+          ms_old=ms_now;
+      }
+      deep_sum_old=hal.util->deep_sum;
+
+
+  //    if(wp_sum==8&&wp_fllag==0)
+  //    {
+  //        wp_fllag=1;
+  //
+  //
+  //
+  //        Location sde;
+  //        sde.alt=10000;
+  //        sde.lat=-353632599;
+  //        sde.lng=1491655199;
+  //        ModeGuided gui;
+  //        gui.start_guided();//
+  //        bool si=gui.set_desired_location(sde);
+  //        gcs().send_text(MAV_SEVERITY_CRITICAL, "开始guided,%d",si);
+  //        Rover::set_mode(Mode::Number::GUIDED, ModeReason::OA_bizhang);
+  ////        bool si= ModeGuided::set_desired_location(sde, 4.0);
+  //       // bool si= g2.wp_nav.set_desired_location(sde, 4.0);
+  //        si=g2.wp_nav.set_desired_location_to_stopping_location();
+  //        gui.start_guided();//需要设置一个合理的停止点才能成功??
+  ////        ModeGuided::_guided_mode=ModeGuided::Guided_WP;
+  //        gcs().send_text(MAV_SEVERITY_CRITICAL, "结束guided,%d",si);
+  //        gui.start_guided();
+  //    }
+  //    else if(wp_sum==1)wp_fllag=0;
+  //    if( wp_fllag==1)
+  //    {
+  //        if (g2.wp_nav.reached_destination()) //抵达目的地返回TRUE
+  //        {
+  //            Rover::set_mode(Mode::Number::AUTO, ModeReason::OA_bizhang);
+  //            wp_fllag=3;
+  //        }
+  //    }
 
 //    if(hal.util->water_deep_n>15)//@SIC,,GET,DATA.DEEP,OK,水深数据*CRC\r\n
 //    {

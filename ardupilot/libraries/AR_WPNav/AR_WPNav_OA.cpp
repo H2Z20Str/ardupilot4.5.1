@@ -21,7 +21,7 @@
 #include <AP_InternalError/AP_InternalError.h>
 
 extern const AP_HAL::HAL& hal;
-
+extern int wp_sum;
 // update navigation
 void AR_WPNav_OA::update(float dt)
 {
@@ -130,13 +130,23 @@ void AR_WPNav_OA::update(float dt)
 
             } // switch (path_planner_used) {
         } // switch (oa_retstate) {
+      if(oa_retstate==AP_OAPathPlanner::OA_SUCCESS) hal.util->bizhang_sum++;
+
+
     } // if (oa != nullptr) {
+
+    if(hal.util->hzz_test[1]==1){
+   // gcs().send_text(MAV_SEVERITY_CRITICAL, "22 deep_sum=%d",hal.util->deep_sum);
+       gcs().send_text(MAV_SEVERITY_CRITICAL, "22  bizhang_sum=%d",hal.util->bizhang_sum);
+    }
+
+
 
     update_oa_distance_and_bearing_to_destination();
 
     // handle stopping vehicle if avoidance has failed
     if (stop_vehicle) {
-        // decelerate to speed to zero and set turn rate to zero
+        // decelerate to speed to zero and set turn rate to zero 减速至零并将转弯率设置为零
         _desired_speed_limited = _atc.get_desired_speed_accel_limited(0.0f, dt);
         _desired_lat_accel = 0.0f;
         _desired_turn_rate_rads = 0.0f;

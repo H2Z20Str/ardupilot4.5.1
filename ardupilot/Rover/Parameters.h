@@ -490,6 +490,8 @@ public:
         AP_Int32 OA_deeps;
         AP_Float OA_deep_v;
 
+        //
+        AP_Int32 hzz_test;
 
 
 };

@@ -66,11 +66,33 @@ public:
     uint8_t mr72_sum2;
     uint16_t mr72_switch;
     //水深数据
-    uint8_t water_deep[40];
-    uint8_t water_deep_n=0;
+    uint8_t water_deep[50];     //水深数据
+    uint8_t water_deep_n=0;     //水深长度
+    uint16_t OA_deep_sum=30;    //水深避障次数
+    uint8_t deep_sum=0;         //触发次数
+    float DEEP_V=0.8;           //浅水避障速度
+    float deep_log=0;           //日志记录水深
+    uint8_t deep_sleep_flag=0;  //避障休眠标志
+    uint8_t deep_fllag=0;       //浅水避障标志
+
+    float deep_mav_L=0;
+    float deep_mav_H=0;
+
+    //避障参数
+    uint16_t bizhang_sum=0;     //避障实时计数
+    uint16_t bizhang_sum_old=0; //避障上次计数
+    int32_t OA_ms=10000;        //清零时间
+    int32_t OA_sum=50;          //避障计数值
+
+    //电池数据
+    float battery_voltage=0;//电池电压
+    float battery_current=0;//电池电流
+    uint8_t battery_remaining=0;//剩余电量 1-100
+    float battery_temp=0;//温度
 
 
-
+    //调试使用
+    uint8_t hzz_test[10];
     /*
       persistent data structure. This data is restored on boot if
       there has been a watchdog reset.  The data in this structure
