@@ -11,8 +11,8 @@
     LOG_GPS_RAWS_MSG,                           \
     LOG_GPS_UBX1_MSG,                           \
     LOG_GPS_UBX2_MSG,                           \
-    LOG_IDS_FROM_GPS_SBP
-
+    LOG_IDS_FROM_GPS_SBP,\
+    LOG_SOUT_RTK
 
 // @LoggerMessage: GPS
 // @Description: Information received from GNSS systems attached to the autopilot
@@ -203,9 +203,18 @@ struct PACKED log_GPS_RAWS {
     uint8_t trkStat;
 };
 
+struct PACKED log_south_RTK {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    char msg[64];
+    char msg2[64];
+};
+
 #define LOG_STRUCTURE_FROM_GPS \
     { LOG_GPS_MSG, sizeof(log_GPS), \
-      "GPS",  "QBBIHBcLLeffffB", "TimeUS,I,Status,GMS,GWk,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,VZ,Yaw,U", "s#-s-S-DUmnhnh-", "F--C-0BGGB000--" , true }, \
+      "GPS",  "QBBIHBcLLeffffB", "TimeUS,I,Status,GMS,GWk,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,SL,SH,U", "s#-s-S-DUmnhnh-", "F--C-0BGGB000--" , true }, \
+    { LOG_SOUT_RTK, sizeof(log_south_RTK),\
+      "RTK",  "QZZ",     "TimeUS,Message,Message2", "s--", "F--" , true },\
     { LOG_GPA_MSG,  sizeof(log_GPA), \
       "GPA",  "QBCCCCfBIHfHH", "TimeUS,I,VDop,HAcc,VAcc,SAcc,YAcc,VV,SMS,Delta,Und,RTCMFU,RTCMFD", "s#-mmnd-ssm--", "F-BBBB0-CC0--" , true }, \
     { LOG_GPS_UBX1_MSG, sizeof(log_Ubx1), \

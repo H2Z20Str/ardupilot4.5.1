@@ -40,6 +40,13 @@
 
 #include "AP_GPS_NMEA.h"
 
+#include <GCS_MAVLink/GCS.h>
+#include <AP_Logger/AP_Logger.h>
+#include <AP_Common/AP_Common.h>
+
+char buf_gps[256],buf_flag=0;
+int16_t buf_gps_sum=0;
+
 #if AP_GPS_NMEA_ENABLED
 extern const AP_HAL::HAL& hal;
 
@@ -82,6 +89,37 @@ bool AP_GPS_NMEA::read(void)
 bool AP_GPS_NMEA::_decode(char c)
 {
     _sentence_length++;
+
+
+
+    //读取rtk 数据 H2Z 2024.01.26
+    if(c=='$')buf_flag=1; //开始记录
+    if(buf_flag!=0)
+    {
+        buf_gps[buf_gps_sum++]=c;
+        if(c=='\r'||c=='\n')
+          {
+            buf_flag=0; //遇到换行时，结束记录
+            //gga 数据存入日志
+            if (strncmp(buf_gps, "$GPGGA",strlen("$GPGGA")) == 0 || strncmp(buf_gps, "$GPZDA",strlen("$GPZDA")) == 0)
+            {
+                const struct log_south_RTK pkt= {
+                LOG_PACKET_HEADER_INIT(LOG_SOUT_RTK),
+                        time_us       :  AP_HAL::micros64(),
+                        msg  : {},
+                        msg2 : {}
+                        };
+               // gcs().send_text(MAV_SEVERITY_CRITICAL, "k=%d\r\n",buf_gps_sum);
+                strncpy_noterm((char *)pkt.msg, (const char *)buf_gps, 64);
+                strncpy_noterm((char *)pkt.msg2, (const char *)&buf_gps[65],64 );//sizeof(&buf_gps[65])
+                AP::logger().WriteBlock(&pkt, sizeof(pkt));
+            }
+            buf_gps_sum=0;
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%sd\r\n",buf_gps);
+            memset(buf_gps,'\0',256);
+          }
+    }
+
         
     switch (c) {
     case ';':
@@ -115,6 +153,7 @@ bool AP_GPS_NMEA::_decode(char c)
 
     case '$': // sentence begin
     case '#': // unicore message begin
+        buf_flag=1;
         _is_unicore = (c == '#');
         _term_number = _term_offset = 0;
         _parity = 0;

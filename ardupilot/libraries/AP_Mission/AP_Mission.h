@@ -79,44 +79,44 @@ public:
 
     // condition delay command structure
     struct PACKED Conditional_Distance_Command {
-        float meters;           // distance from next waypoint in meters
+        float meters;           // distance from next waypoint in meters 与下一个航路点的距离（米）
     };
 
-    // condition yaw command structure
+    // condition yaw command structure 条件偏航指令结构
     struct PACKED Yaw_Command {
-        float angle_deg;        // target angle in degrees (0=north, 90=east)
-        float turn_rate_dps;    // turn rate in degrees / second (0=use default)
+        float angle_deg;        // target angle in degrees (0=north, 90=east) 目标角度（以度为单位）（0=北，90=东）
+        float turn_rate_dps;    // turn rate in degrees / second (0=use default) 转动率（以度/秒为单位）（0=使用默认值）
         int8_t direction;       // -1 = ccw, +1 = cw
         uint8_t relative_angle; // 0 = absolute angle, 1 = relative angle
     };
 
-    // change speed command structure
+    // change speed command structure 改变速度指令结构
     struct PACKED Change_Speed_Command {
-        uint8_t speed_type;     // 0=airspeed, 1=ground speed
-        float target_ms;        // target speed in m/s, -1 means no change
-        float throttle_pct;     // throttle as a percentage (i.e. 1 ~ 100), 0 means no change
+        uint8_t speed_type;     // 0=airspeed, 1=ground speed 0=空速，1=地面速度
+        float target_ms;        // target speed in m/s, -1 means no change 目标速度（m/s），-1表示无变化
+        float throttle_pct;     // throttle as a percentage (i.e. 1 ~ 100), 0 means no change 节气门为百分比（即1~100），0表示没有变化
     };
 
-    // set relay command structure
+    // set relay command structure 设置继电器命令结构
     struct PACKED Set_Relay_Command {
         uint8_t num;            // relay number from 1 to 4
         uint8_t state;          // on = 3.3V or 5V (depending upon board), off = 0V.  only used for do-set-relay, not for do-repeat-relay
     };
 
-    // repeat relay command structure
+    // repeat relay command structure 重复中继命令结构
     struct PACKED Repeat_Relay_Command {
         uint8_t num;            // relay number from 1 to 4
         int16_t repeat_count;   // number of times to trigger the relay
         float cycle_time;       // cycle time in seconds (the time between peaks or the time the relay is on and off for each cycle?)
     };
 
-    // set servo command structure
+    // set servo command structure 设置伺服命令结构
     struct PACKED Set_Servo_Command {
         uint8_t channel;        // servo channel
         uint16_t pwm;           // pwm value for servo
     };
 
-    // repeat servo command structure
+    // repeat servo command structure 重复伺服指令结构
     struct PACKED Repeat_Servo_Command {
         uint8_t channel;        // servo channel
         uint16_t pwm;           // pwm value for servo
@@ -124,14 +124,14 @@ public:
         float cycle_time;       // cycle time in seconds (the time between peaks or the time the servo is at the specified pwm value for each cycle?)
     };
 
-    // mount control command structure
+    // mount control command structure 装载控制命令结构
     struct PACKED Mount_Control {
         float pitch;            // pitch angle in degrees
         float roll;             // roll angle in degrees
         float yaw;              // yaw angle (relative to vehicle heading) in degrees
     };
 
-    // digicam control command structure
+    // digicam control command structure digicam控制命令结构
     struct PACKED Digicam_Configure {
         uint8_t shooting_mode;  // ProgramAuto = 1, AV = 2, TV = 3, Man=4, IntelligentAuto=5, SuperiorAuto=6
         uint16_t shutter_speed;
@@ -142,7 +142,7 @@ public:
         float engine_cutoff_time;   // seconds
     };
 
-    // digicam control command structure
+    // digicam control command structure digicam控制命令结构
     struct PACKED Digicam_Control {
         uint8_t session;        // 1 = on, 0 = off
         uint8_t zoom_pos;
@@ -306,10 +306,10 @@ public:
     };
 
     union Content {
-        // jump structure
+        // jump structure 跳跃结构
         Jump_Command jump;
 
-        // conditional delay
+        // conditional delay 有条件延迟
         Conditional_Delay_Command delay;
 
         // conditional distance

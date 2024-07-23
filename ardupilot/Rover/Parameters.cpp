@@ -745,11 +745,15 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
     AP_GROUPINFO("VEL_AUTO_2", 15, ParametersG3, velocity_auto_2, 148),//切换速度控制通道，0是SW1,1是AUX1
 
 
-    AP_GROUPINFO("OA_Avoid_ms", 16, ParametersG3, OA_Avoid_ms, 10000),//避障间隔
-    AP_GROUPINFO("OA_Avoid_sum", 17, ParametersG3, OA_Avoid_sum, 50),//避障次数
+    AP_GROUPINFO("OA_Avoid_ms", 16, ParametersG3, OA_Avoid_ms, 8000),//避障间隔
+    AP_GROUPINFO("OA_Avoid_sum", 17, ParametersG3, OA_Avoid_sum, 350),//避障次数
     AP_GROUPINFO("OA_Avoid_EN", 18, ParametersG3, OA_Avoid_en, 0),//避障开关，1为开，0为关
 
     AP_GROUPINFO("HZZ_test", 19, ParametersG3, hzz_test, 0),
+    AP_GROUPINFO("VEL_Radius_V", 20, ParametersG3, speed_radius, 0.8),
+    AP_GROUPINFO("VEL_BAT_RTL", 21, ParametersG3, batter_rtl, 20),
+
+
 
 
     AP_GROUPEND

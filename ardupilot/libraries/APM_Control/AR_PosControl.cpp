@@ -21,6 +21,7 @@
 #include <AP_Logger/AP_Logger.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AC_Avoidance/AC_Avoid.h>
+#include <AR_WPNav/AR_WPNav.h>
 
 #define AR_POSCON_TIMEOUT_MS            100     // timeout after 0.1 sec
 #define AR_POSCON_POS_P                 0.2f    // default position P gain
@@ -109,6 +110,12 @@ AR_PosControl::AR_PosControl(AR_AttitudeControl& atc) :
     AP_Param::setup_object_defaults(this, var_info);
 }
 
+extern int wp_sum;
+//AR_WPNav &AR_WPNav_south;    // rover position control library
+
+extern float south_distance;
+extern float south_radius;
+extern float vel_speed_radius;
 // update navigation
 void AR_PosControl::update(float dt)
 {
@@ -206,7 +213,45 @@ void AR_PosControl::update(float dt)
         }
     }
     _desired_speed = _atc.get_desired_speed_accel_limited(des_speed, dt);
+//
+//    if(wp_sum==6||wp_sum==8)
+//      _desired_speed=1;
 
+    //自动速度控制 _desired_speed_limited  bool set_speed_max(float speed_max);
+    //靠近航点减速
+//    if(hal.util->hzz_test[0]==1)
+//    {
+//      if(south_distance<=(south_radius+1.5*(hal.util->auto_speed-0.4)))//减速带
+//       {
+//          _desired_speed=((hal.util->auto_speed-0.4)<vel_speed_radius?(hal.util->auto_speed-0.4):vel_speed_radius);
+//       }
+//      else if(south_distance<=(south_radius+3*(hal.util->auto_speed-0.4)))//减速带
+//        {
+//          _desired_speed=((hal.util->auto_speed-0.4)<2.6?(hal.util->auto_speed-0.4):1.6);
+//        }
+//      else if(south_distance<=(south_radius+4.5*(hal.util->auto_speed-0.4)))//减速带
+//        {
+//          _desired_speed=((hal.util->auto_speed-0.4)<4.0?(hal.util->auto_speed-0.4):3.2);
+//        }
+////       else _desired_speed=(hal.util->auto_speed-0.4);
+//
+//       if(hal.util->deep_sleep_flag==1) _desired_speed=((hal.util->auto_speed-0.4)<hal.util->DEEP_V?(hal.util->auto_speed-0.4):hal.util->DEEP_V);//浅水避障减速
+//     //  if (hal.util->bizhang_sum!=0)_base_speed_max=(_speed_max<1.2?_speed_max:0.9);//避障减速
+//       if (hal.util->bizhang_sum!=0)_desired_speed=((hal.util->auto_speed-0.4)<1.2?(hal.util->auto_speed-0.4):0.9);//避障减速
+//    }
+//    else if(hal.util->hzz_test[0]==2)
+    {
+        if(south_distance<=(south_radius+3.5*(hal.util->auto_speed-0.4)))//减速带
+         {
+            _desired_speed=((hal.util->auto_speed-0.4)<vel_speed_radius?(hal.util->auto_speed-0.4):vel_speed_radius);
+         }
+//         else _desired_speed=(hal.util->auto_speed-0.4);
+
+         if(hal.util->deep_sleep_flag==1) _desired_speed=((hal.util->auto_speed-0.4)<hal.util->DEEP_V?(hal.util->auto_speed-0.4):hal.util->DEEP_V);//浅水避障减速
+       //  if (hal.util->bizhang_sum!=0)_base_speed_max=(_speed_max<1.2?_speed_max:0.9);//避障减速
+         if (hal.util->bizhang_sum!=0)_desired_speed=((hal.util->auto_speed-0.4)<1.2?(hal.util->auto_speed-0.4):0.9);//避障减速
+
+    }
     // calculate turn rate from desired lateral acceleration
     _desired_lat_accel = stopping ? 0 : accel_target_FR.y;
     _desired_turn_rate_rads = _atc.get_turn_rate_from_lat_accel(_desired_lat_accel, _desired_speed);

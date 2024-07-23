@@ -249,8 +249,16 @@ void SRV_Channels::enable_aux_servos()
         SRV_Channel &c = channels[i];
 
 
-        if(i==0)c.servo_max.set(hal.util->pwm_out1);
-        else if(i==1)c.servo_max.set(hal.util->pwm_out2);
+        if(i==0)
+          {
+            c.servo_max.set(hal.util->pwm_out1);
+            c.servo_min.set(3000-hal.util->pwm_out1);
+          }
+        else if(i==1)
+           {
+             c.servo_max.set(hal.util->pwm_out2);
+             c.servo_min.set(3050-hal.util->pwm_out2);
+           }
 
 
         // see if it is a valid function

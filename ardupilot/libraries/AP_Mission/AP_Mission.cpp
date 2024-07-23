@@ -107,11 +107,11 @@ void AP_Mission::start()
 {
     _flags.state = MISSION_RUNNING;
 
-    reset(); // reset mission to the first command, resets jump tracking
+    reset(); // reset mission to the first command, resets jump tracking 将任务重置为第一个命令，重置跳跃跟踪
 
-    // advance to the first command
+    // advance to the first command 前进到第一个命令
     if (!advance_current_nav_cmd()) {
-        // on failure set mission complete
+        // on failure set mission complete 故障集任务完成
         complete();
     }
 }
@@ -323,9 +323,9 @@ void AP_Mission::update()
 
     // check if we have an active nav command
     if (!_flags.nav_cmd_loaded || _nav_cmd.index == AP_MISSION_CMD_INDEX_NONE) {
-        // advance in mission if no active nav command
+        // advance in mission if no active nav command 如果没有主动导航命令，则推进任务
         if (!advance_current_nav_cmd()) {
-            // failure to advance nav command means mission has completed
+            // failure to advance nav command means mission has completed 未能推进导航指令意味着任务已经完成
             complete();
             return;
         }
@@ -343,6 +343,15 @@ void AP_Mission::update()
         }
     }
 
+//    if(hal.util->bizhang_sum>hal.util->OA_sum)//避障次数大于设定值，则跳点
+//    {
+//        hal.util->bizhang_sum=0;
+//        //advance_current_nav_cmd(); //没起作用
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "avoidance 00");
+//     //   cmd.id = MAV_CMD_NAV_WAYPOINT;
+//        //complete();//直接结束航线
+//
+//    }
     // check if we have an active do command
     if (!_flags.do_cmd_loaded) {
         advance_current_do_cmd();
@@ -397,7 +406,7 @@ bool AP_Mission::verify_command(const Mission_Command& cmd)
 
 bool AP_Mission::start_command(const Mission_Command& cmd)
 {
-    // check for landing related commands and set in_landing_sequence flag
+    // check for landing related commands and set in_landing_sequence flag 检查与着陆相关的命令并设置in_landing_sequence标志
     if (is_landing_type_cmd(cmd.id) || cmd.id == MAV_CMD_DO_LAND_START) {
         set_in_landing_sequence_flag(true);
     } else if (is_takeoff_type_cmd(cmd.id)) {
@@ -409,7 +418,7 @@ bool AP_Mission::start_command(const Mission_Command& cmd)
     } else {
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Mission: %u %s", cmd.index, cmd.type());
     }
-
+  //  gcs().send_text(MAV_SEVERITY_CRITICAL, "cmd.id =%d",cmd.id);
     switch (cmd.id) {
 #if AP_RC_CHANNEL_ENABLED
     case MAV_CMD_DO_AUX_FUNCTION:
@@ -622,7 +631,7 @@ bool AP_Mission::set_current_cmd(uint16_t index)
 
     // the state must be MISSION_RUNNING, allow advance_current_nav_cmd() to manage starting the item
     if (!advance_current_nav_cmd(index)) {
-        // on failure set mission complete
+        // on failure set mission complete 故障集任务完成
         complete();
         return false;
     }
@@ -1942,13 +1951,14 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
 ///
 
 /// complete - mission is marked complete and clean-up performed including calling the mission_complete_fn
+///complete（完成）-任务标记为已完成，并执行清理，包括调用mission_complete_fn
 void AP_Mission::complete()
 {
-    // flag mission as complete
+    // flag mission as complete 将任务标记为完成
     _flags.state = MISSION_COMPLETE;
     _flags.in_landing_sequence = false;
 
-    // callback to main program's mission complete function
+    // callback to main program's mission complete function 回调到主程序的任务完成函数
     _mission_complete_fn();
 }
 
@@ -1956,45 +1966,49 @@ void AP_Mission::complete()
 ///     do command will also be loaded
 ///     accounts for do-jump commands
 //      returns true if command is advanced, false if failed (i.e. mission completed)
+///advance_current_nav_cmd-向前移动当前nav命令
+///do命令也将被加载
+///do跳转命令的帐户
+//如果命令已执行，则返回true；如果失败（即任务已完成），则返回false
 bool AP_Mission::advance_current_nav_cmd(uint16_t starting_index)
 {
-    // exit immediately if we're not running
+    // exit immediately if we're not running 如果我们不跑步，请立即退出
     if (_flags.state != MISSION_RUNNING) {
         return false;
     }
 
-    // exit immediately if current nav command has not completed
+    // exit immediately if current nav command has not completed 如果当前导航命令尚未完成，则立即退出
     if (_flags.nav_cmd_loaded) {
         return false;
     }
 
-    // stop the current running do command
+    // stop the current running do command 停止当前运行的do命令
     _do_cmd.index = AP_MISSION_CMD_INDEX_NONE;
     _flags.do_cmd_loaded = false;
     _flags.do_cmd_all_done = false;
 
-    // get starting point for search
+    // get starting point for search 获取搜索起点
     uint16_t cmd_index = starting_index > 0 ? starting_index - 1 : _nav_cmd.index;
     if (cmd_index == AP_MISSION_CMD_INDEX_NONE) {
-        // start from beginning of the mission command list
+        // start from beginning of the mission command list 从任务命令列表的开头开始
         cmd_index = AP_MISSION_FIRST_REAL_COMMAND;
     } else {
-        // start from one position past the current nav command
+        // start from one position past the current nav command 从当前导航命令之后的一个位置开始
         cmd_index++;
     }
 
-    // avoid endless loops
+    // avoid endless loops 避免无休止的循环
     uint8_t max_loops = 255;
 
-    // search until we find next nav command or reach end of command list
+    // search until we find next nav command or reach end of command list 搜索直到找到下一个导航命令或到达命令列表的末尾
     while (!_flags.nav_cmd_loaded && max_loops-- > 0) {
-        // get next command
+        // get next command 获取下一个命令
         Mission_Command cmd;
         if (!get_next_cmd(cmd_index, cmd, true)) {
             return false;
         }
 
-        // check if navigation or "do" command
+        // check if navigation or "do" command 检查导航或“执行”命令
         if (is_nav_cmd(cmd)) {
             // save previous nav command index
             _prev_nav_cmd_id = _nav_cmd.id;
@@ -2003,7 +2017,7 @@ bool AP_Mission::advance_current_nav_cmd(uint16_t starting_index)
             if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
                 _prev_nav_cmd_wp_index = _nav_cmd.index;
             }
-            // set current navigation command and start it
+            // set current navigation command and start it 设置当前导航命令并启动它
             _nav_cmd = cmd;
             if (start_command(_nav_cmd)) {
                 _flags.nav_cmd_loaded = true;
@@ -2051,7 +2065,7 @@ bool AP_Mission::advance_current_nav_cmd(uint16_t starting_index)
         _flags.do_cmd_all_done = true;
     }
 
-    // if we got this far we must have successfully advanced the nav command
+    // if we got this far we must have successfully advanced the nav command 如果我们走到这一步，我们一定已经成功地推进了导航命令
     return true;
 }
 

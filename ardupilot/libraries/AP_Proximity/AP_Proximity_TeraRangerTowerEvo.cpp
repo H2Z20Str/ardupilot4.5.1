@@ -159,7 +159,8 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
     if(hal.util->mr72_sum2>=20)
     {
         hal.util->mr72_sum2=0;
-//        gcs().send_text(MAV_SEVERITY_CRITICAL, "bb %s",hal.util->mr72_buff2);
+        if(hal.util->hzz_test[3]==3)
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "%s",hal.util->mr72_buff2);
         if(hal.util->mr72_buff2[0]=='T'&&hal.util->mr72_buff2[1]=='H')
         {
 //            for(int i=0;i<20;i++)

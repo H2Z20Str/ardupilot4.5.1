@@ -2368,8 +2368,9 @@ void AP_GPS::Write_GPS(uint8_t i)
         altitude      : loc.alt,
         ground_speed  : ground_speed(i),
         ground_course : ground_course(i),
-        vel_z         : velocity(i).z,
-        yaw           : yaw_deg,
+        //vel_z         : velocity(i).z,
+        vel_z         : hal.util->deep_log,
+        yaw           : hal.util->deep_mav_H,//yaw_deg,
         used          : (uint8_t)(AP::gps().primary_sensor() == i)
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));

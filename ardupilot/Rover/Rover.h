@@ -343,6 +343,8 @@ private:
     void send_wheel_encoder_distance(mavlink_channel_t chan);
 
     // Log.cpp
+    void Log_Write_SPOS();
+    void Log_Write_south(const char *message);
     void Log_Write_Attitude();
     void Log_Write_Depth();
     void Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target);

@@ -351,6 +351,8 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
     cell_mvolts[0]=hal.util->battery_voltage*1000;
     cell_mvolts[1]=hal.util->deep_mav_L*1000;
     cell_mvolts[2]=hal.util->deep_mav_H*1000;
+    cell_mvolts[3]=hal.util->tip;   //
+
     current=hal.util->battery_current*100;
     int8_t percentage = hal.util->battery_remaining;
 

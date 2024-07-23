@@ -199,12 +199,12 @@ AP_OAPathPlanner::OA_RetState AP_OAPathPlanner::mission_avoidance(const Location
                                          bool &result_dest_to_next_dest_clear,
                                          OAPathPlannerUsed &path_planner_used)
 {
-    // exit immediately if disabled or thread is not running from a failed init
+    // exit immediately if disabled or thread is not running from a failed init 如果已禁用或线程没有从失败的init运行，则立即退出
     if (_type == OA_PATHPLAN_DISABLED || !_thread_created) {
         return OA_NOT_REQUIRED;
     }
 
-    // check if just activated to avoid initial timeout error
+    // check if just activated to avoid initial timeout error 检查是否刚刚激活以避免初始超时错误
     const uint32_t now = AP_HAL::millis();
     if (now - _last_update_ms > 200) {
         _activated_ms = now;
@@ -213,7 +213,7 @@ AP_OAPathPlanner::OA_RetState AP_OAPathPlanner::mission_avoidance(const Location
 
     WITH_SEMAPHORE(_rsem);
 
-    // place new request for the thread to work on
+    // place new request for the thread to work on 为要处理的线程放置新的请求
     avoidance_request.current_loc = current_loc;
     avoidance_request.origin = origin;
     avoidance_request.destination = destination;
@@ -223,13 +223,15 @@ AP_OAPathPlanner::OA_RetState AP_OAPathPlanner::mission_avoidance(const Location
 
     // check result's destination and next_destination matches our request
     // e.g. check this result was using our current inputs and not from an old request
+    //检查结果的destination和nextdestination是否符合我们的请求
+    //例如，检查这个结果是使用我们当前的输入，而不是来自旧的请求
     const bool destination_matches = destination.same_latlon_as(avoidance_result.destination);
     const bool next_destination_matches = next_destination.same_latlon_as(avoidance_result.next_destination);
 
-    // check results have not timed out
+    // check results have not timed out 检查结果尚未超时
     const bool timed_out = (now - avoidance_result.result_time_ms > OA_TIMEOUT_MS) && (now - _activated_ms > OA_TIMEOUT_MS);
 
-    // return results from background thread's latest checks
+    // return results from background thread's latest checks 返回后台线程的最新检查结果
     if (destination_matches && next_destination_matches && !timed_out) {
         // we have a result from the thread
         result_origin = avoidance_result.origin_new;
@@ -240,12 +242,12 @@ AP_OAPathPlanner::OA_RetState AP_OAPathPlanner::mission_avoidance(const Location
         return avoidance_result.ret_state;
     }
 
-    // if timeout then path planner is taking too long to respond
+    // if timeout then path planner is taking too long to respond 如果超时，则路径规划器的响应时间过长
     if (timed_out) {
         return OA_ERROR;
     }
 
-    // background thread is working on a new destination
+    // background thread is working on a new destination 后台线程正在处理一个新的目标
     return OA_PROCESSING;
 }
 

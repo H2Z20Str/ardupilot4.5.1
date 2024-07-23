@@ -492,6 +492,9 @@ public:
 
         //
         AP_Int32 hzz_test;
+        AP_Float speed_radius;
+
+        AP_Int16 batter_rtl;
 
 
 };

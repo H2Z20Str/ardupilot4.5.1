@@ -41,7 +41,7 @@ void ModeAuto::_exit()
         mission.stop();
     }
 }
-
+int wp_sum=0;
 void ModeAuto::update()
 {
     // check if mission exists (due to being cleared while disarmed in AUTO,
@@ -82,26 +82,47 @@ void ModeAuto::update()
     switch (_submode) {
         case SubMode::WP:
         {
-            // boats loiter once the waypoint is reached
-            bool keep_navigating = true;
-            if (rover.is_boat() && g2.wp_nav.reached_destination() && !g2.wp_nav.is_fast_waypoint()) {
-                keep_navigating = !start_loiter();
-            }
 
-            // update navigation controller
-            if (keep_navigating) {
-                navigate_to_waypoint();
-            }
+//            {// boats loiter once the waypoint is reached
+//            bool keep_navigating = true;
+//            if (rover.is_boat() && g2.wp_nav.reached_destination() && !g2.wp_nav.is_fast_waypoint()) {
+//                keep_navigating = !start_loiter();
+//             //   gcs().send_text(MAV_SEVERITY_CRITICAL, "A=%d,b=%d,c=%d",g2.wp_nav.reached_destination(),g2.wp_nav.is_fast_waypoint(), keep_navigating );
+//            }
+//          //  if(wp_sum==3) keep_navigating=false;
+//            // update navigation controller
+//            if (keep_navigating) {
+////                gcs().send_text(MAV_SEVERITY_CRITICAL, "A=%d,b=%d,c=%d",g2.wp_nav.reached_destination(),g2.wp_nav.is_fast_waypoint(), keep_navigating );
+//
+//             //   gcs().send_text(MAV_SEVERITY_CRITICAL, "aaa");
+//                navigate_to_waypoint();
+//            }
+//            }
+            if (!g2.wp_nav.reached_destination()) { //如果车辆已到达所需位置，则为true。默认为true，因为这通常由任务使用，我们不希望任务陷入困境
+                            // update navigation controller 更新导航控制器
+                            navigate_to_waypoint();
+                        } else {
+                            // we have reached the destination so stay here 我们已经到达目的地了，所以留在这里
+                            if (rover.is_boat()) {
+                                if (!start_loiter()) {
+                                    stop_vehicle();
+                                }
+                            } else {
+                                stop_vehicle();
+                            }
+                            // update distance to destination 更新到目的地的距离
+                            _distance_to_destination = rover.current_loc.get_distance(g2.wp_nav.get_destination());
+                        }
             break;
         }
 
         case SubMode::HeadingAndSpeed:
         {
             if (!_reached_heading) {
-                // run steering and throttle controllers
+                // run steering and throttle controllers 运行转向和油门控制器
                 calc_steering_to_heading(_desired_yaw_cd);
                 calc_throttle(calc_speed_nudge(_desired_speed, is_negative(_desired_speed)), true);
-                // check if we have reached within 5 degrees of target
+                // check if we have reached within 5 degrees of target 检查我们是否已到达目标5度以内
                 _reached_heading = (fabsf(_desired_yaw_cd - ahrs.yaw_sensor) < 500);
             } else {
                 // we have reached the destination so stay here
@@ -144,6 +165,7 @@ void ModeAuto::update()
             rover.g2.mode_circle.update();
             break;
     }
+
 }
 
 void ModeAuto::calc_throttle(float target_speed, bool avoidance_enabled)
@@ -277,7 +299,7 @@ float ModeAuto::get_distance_to_destination() const
     return 0.0f;
 }
 
-// get desired location
+// get desired location 获取所需位置
 bool ModeAuto::get_desired_location(Location& destination) const
 {
     switch (_submode) {
@@ -309,6 +331,7 @@ bool ModeAuto::get_desired_location(Location& destination) const
 // set desired location to drive to
 bool ModeAuto::set_desired_location(const Location &destination, Location next_destination)
 {
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "ModeAuto::set_desired");
     // call parent
     if (!Mode::set_desired_location(destination, next_destination)) {
         return false;
@@ -319,7 +342,7 @@ bool ModeAuto::set_desired_location(const Location &destination, Location next_d
     return true;
 }
 
-// return true if vehicle has reached or even passed destination
+// return true if vehicle has reached or even passed destination 如果车辆已到达甚至经过目的地，则返回true
 bool ModeAuto::reached_destination() const
 {
     switch (_submode) {
@@ -484,7 +507,7 @@ void ModeAuto::start_stop()
     _submode = SubMode::Stop;
 }
 
-// send latest position target to offboard navigation system
+// send latest position target to offboard navigation system 将最新位置目标发送到车外导航系统
 void ModeAuto::send_guided_position_target()
 {
     if (!guided_target.valid) {
@@ -510,8 +533,9 @@ void ModeAuto::send_guided_position_target()
 /********************************************************************************/
 // Command Event Handlers
 /********************************************************************************/
-bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
+bool ModeAuto::start_command1(const AP_Mission::Mission_Command& cmd)
 {
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "start_command");
 #if HAL_LOGGING_ENABLED
     // log when new commands start
     if (rover.should_log(MASK_LOG_CMD)) {
@@ -520,7 +544,8 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
 #endif
 
     switch (cmd.id) {
-    case MAV_CMD_NAV_WAYPOINT:  // Navigate to Waypoint
+    case MAV_CMD_NAV_WAYPOINT:  // Navigate to Waypoint 导航到航路点
+      // gcs().send_text(MAV_SEVERITY_CRITICAL, "do_nav_wp 00");
         return do_nav_wp(cmd, false);
 
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:
@@ -529,6 +554,7 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
 
     case MAV_CMD_NAV_LOITER_UNLIM:  // Loiter indefinitely
     case MAV_CMD_NAV_LOITER_TIME:   // Loiter for specified time
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "do_nav_wp 22");
         return do_nav_wp(cmd, true);
 
     case MAV_CMD_NAV_LOITER_TURNS:
@@ -643,8 +669,8 @@ void ModeAuto::exit_mission()
 
 
 char south_wp_radius=0;
-int wp_sum=0;
-unsigned char str[]={0x54,0x48,0x0D,0xAD,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x1F,0x0F,0x0C,0x0F,0x5C,0xF4,0x34,0x01};
+
+//unsigned char str[]={0x54,0x48,0x0D,0xAD,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x1F,0x0F,0x0C,0x0F,0x5C,0xF4,0x34,0x01};
 // verify_command_callback - callback function called from ap-mission at 10hz or higher when a command is being run
 //      we double check that the flight mode is AUTO to avoid the possibility of ap-mission triggering actions while we're not in AUTO mode
 bool ModeAuto::verify_command_callback(const AP_Mission::Mission_Command& cmd)
@@ -652,13 +678,14 @@ bool ModeAuto::verify_command_callback(const AP_Mission::Mission_Command& cmd)
     const bool cmd_complete = verify_command(cmd);
     AP_Mission::Mission_Command next_cmd;
 
-     wp_sum=cmd.index;
-
-     if(wp_sum==6 || wp_sum==8)
-     {
-         strcat((char*)hal.util->mr72_buff2,(const char*)str);
-         hal.util->mr72_sum2=20;
-     }
+//    if(wp_sum==2)
+//        do_nav_wp(cmd, false);
+//     wp_sum=cmd.index;
+//     if(wp_sum==4)
+//     {
+//         gcs().send_text(MAV_SEVERITY_CRITICAL, "bb %d",previously_reached_wp);
+//         previously_reached_wp=true; 没用！
+//     }
 
      if (!mission.get_next_nav_cmd(cmd.index+1, next_cmd)) //判断是否是最后一个点 h2z 2023.8.25
      {
@@ -768,20 +795,20 @@ bool ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd, bool always_sto
     // do not add next wp if there are no more navigation commands
     AP_Mission::Mission_Command next_cmd;
     if (always_stop_at_destination || !mission.get_next_nav_cmd(cmd.index+1, next_cmd)) {
-        // single destination
+        // single destination         单一目的地
         if (!set_desired_location(cmdloc)) {
             return false;
         }
     } else {
-        // retrieve and sanitize next destination location
+        // retrieve and sanitize next destination location 检索下一个目的地位置
         Location next_cmdloc = next_cmd.content.location;
         next_cmdloc.sanitize(cmdloc);
-        if (!set_desired_location(cmdloc, next_cmdloc)) {
+        if (!set_desired_location(cmdloc, next_cmdloc)) { //设置所需的驾驶位置
             return false;
         }
     }
 
-    // just starting so we haven't previously reached the waypoint
+    // just starting so we haven't previously reached the waypoint 刚刚开始，所以我们之前还没有到达该航路点
     previously_reached_wp = false;
 
     return true;
@@ -855,22 +882,25 @@ bool ModeAuto::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
         return false;
     }
 
-    // Check if this is the first time we have noticed reaching the waypoint
+    // Check if this is the first time we have noticed reaching the waypoint 检查这是否是我们第一次注意到到达该航路点
     if (!previously_reached_wp) {
-        previously_reached_wp = true;
+        previously_reached_wp = true;// 如果我们曾经到达过该航路点，则设置为true
 
         // check if we are loitering at this waypoint - the message sent to the GCS is different
+        //检查我们是否在该航路点徘徊-发送给地面军事系统的信息不同
         if (loiter_duration > 0) {
             // send message including loiter time
-            gcs().send_text(MAV_SEVERITY_INFO, "Reached waypoint #%u. Loiter for %u seconds",
+            gcs().send_text(MAV_SEVERITY_INFO, "22 Reached waypoint #%u. Loiter for %u seconds",
                             (unsigned int)cmd.index,
                             (unsigned int)loiter_duration);
             // record the current time i.e. start timer
             loiter_start_time = millis();
         } else {
             // send simpler message to GCS
-            gcs().send_text(MAV_SEVERITY_INFO, "Reached waypoint #%u", (unsigned int)cmd.index);
+            gcs().send_text(MAV_SEVERITY_INFO, "11 Reached waypoint #%u", (unsigned int)cmd.index);
+
         }
+        wp_sum=cmd.index+1;
     }
 
     // Check if we have loitered long enough
@@ -902,7 +932,7 @@ bool ModeAuto::verify_loiter_unlimited(const AP_Mission::Mission_Command& cmd)
     verify_nav_wp(cmd);
     return false;
 }
-
+//verify_roitter_time-检查我们是否已经游荡了足够长的时间
 // verify_loiter_time - check if we have loitered long enough
 bool ModeAuto::verify_loiter_time(const AP_Mission::Mission_Command& cmd)
 {

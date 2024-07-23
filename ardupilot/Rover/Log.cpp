@@ -4,6 +4,65 @@
 
 #if HAL_LOGGING_ENABLED
 
+
+////////////添加 //////////////
+//// 存储断点位置的日志结构体
+struct PACKED log_SPOS {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    int32_t  latitude;
+    int32_t  longitude;
+    int32_t  altitude;
+    float  deep_water;
+    float  deep_water_1;
+    float  deep_water_2;
+    float  deep_water_3;
+    float  deep_water_4;
+    float  deep_water_5;
+    float  start;
+};
+int32_t GPS_now[3];
+
+extern float deep_water_1,deep_water_2,deep_water_3,deep_water_4,deep_water_5,deep_start;
+void Rover::Log_Write_SPOS()
+{
+    struct log_SPOS pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_SPOS_MSG),
+        time_us             : AP_HAL::micros64(),
+        latitude            : GPS_now[1],//经度
+        longitude           : GPS_now[2],//纬度
+        altitude            : GPS_now[0],//高
+        deep_water         : hal.util->deep_log,
+        deep_water_1       : deep_water_1,
+        deep_water_2       : deep_water_2,
+        deep_water_3       : deep_water_3,
+        deep_water_4       : deep_water_4,
+        deep_water_5       : deep_water_5,
+        start              : deep_start,
+    };
+    logger.WriteBlock(&pkt, sizeof(pkt));
+}
+
+struct PACKED log_south {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    char msg[64];
+};
+
+void Rover::Log_Write_south(const char *message)
+{
+    struct log_south pkt ={
+        LOG_PACKET_HEADER_INIT(LOG_SOUTH_MSG),
+        time_us : AP_HAL::micros64(),
+        msg  : {}
+    };
+    strncpy_noterm(pkt.msg, message, sizeof(pkt.msg)-2);
+    logger.WriteBlock(&pkt, sizeof(pkt));
+}
+
+
+
+
 // Write an attitude packet
 void Rover::Log_Write_Attitude()
 {
@@ -306,6 +365,12 @@ const LogStructure Rover::log_structure[] = {
     
     { LOG_GUIDEDTARGET_MSG, sizeof(log_GuidedTarget),
       "GUIP",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ", "s-mmmnnn", "F-000000" },
+
+
+      { LOG_SPOS_MSG, sizeof(log_SPOS),
+        "SPOS",  "QLLefffffff", "TimeUS,Lat1,Lng1,Alt1,deep,dp1,dp2,dp3,dp4,dp5,sta", "sDUm-------", "FGGB-------" },
+      { LOG_SOUTH_MSG, sizeof(log_south),
+        "SOUT",  "QZ",     "TimeUS,Message", "s-", "F-"},
 };
 
 void Rover::log_init(void)
@@ -316,6 +381,7 @@ void Rover::log_init(void)
 #else  // LOGGING_ENABLED
 
 // dummy functions
+void Rover::Log_Write_SPOS() {}//日志记录
 void Rover::Log_Write_Attitude() {}
 void Rover::Log_Write_Depth() {}
 void Rover::Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target) {}

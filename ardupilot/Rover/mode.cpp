@@ -419,8 +419,15 @@ float Mode::calc_speed_nudge(float target_speed, bool reversed)
 // high level call to navigate to waypoint
 // uses wp_nav to calculate turn rate and speed to drive along the path from origin to destination
 // this function updates _distance_to_destination
+//导航到航路点的高级呼叫
+//使用wpnav计算从起点到终点的转弯率和行驶速度
+//该函数更新实例到目标
+extern int wp_sum;
 void Mode::navigate_to_waypoint()
 {
+//    if(wp_sum==2)
+//    _reached_destination=true; //没起作用
+
     // apply speed nudge from pilot
     // calc_speed_nudge's "desired_speed" argument should be negative when vehicle is reversing
     // AR_WPNav nudge_speed_max argu,ent should always be positive even when reversing
@@ -428,37 +435,40 @@ void Mode::navigate_to_waypoint()
     const float nudge_speed_max = calc_speed_nudge(calc_nudge_input_speed, g2.wp_nav.get_reversed());
     g2.wp_nav.set_nudge_speed_max(fabsf(nudge_speed_max));
 
-    // update navigation controller
+    // update navigation controller //更新导航控制器
     g2.wp_nav.update(rover.G_Dt);
-    _distance_to_destination = g2.wp_nav.get_distance_to_destination();
+    _distance_to_destination = g2.wp_nav.get_distance_to_destination(); //到目的地的回程距离（米）
 
-    // sailboats trigger tack if simple avoidance becomes active
+    // sailboats trigger tack if simple avoidance becomes active 如果简单的回避变得活跃，帆船就会触发航向
     if (g2.sailboat.tack_enabled() && g2.avoid.limits_active()) {
-        // we are a sailboat trying to avoid fence, try a tack
+        // we are a sailboat trying to avoid fence, try a tack 我们是一艘试图避开围栏的帆船
         rover.control_mode->handle_tack_request();
     }
 
     // pass desired speed to throttle controller
     // do not do simple avoidance because this is already handled in the position controller
+    //将所需速度传递给节气门控制器
+    //不要做简单的回避，因为这已经在位置控制器中处理过了
     calc_throttle(g2.wp_nav.get_speed(), false);
 
     float desired_heading_cd = g2.wp_nav.oa_wp_bearing_cd();
     if (g2.sailboat.use_indirect_route(desired_heading_cd)) {
-        // sailboats use heading controller when tacking upwind
+        // sailboats use heading controller when tacking upwind 将航向（以厘米为单位）返回到下一个计入OA的航路点（帆船使用）
         desired_heading_cd = g2.sailboat.calc_heading(desired_heading_cd);
-        // use pivot turn rate for tacks
+        // use pivot turn rate for tacks 对大头钉使用枢轴转动率
         const float turn_rate = g2.sailboat.tacking() ? g2.wp_nav.get_pivot_rate() : 0.0f;
         calc_steering_to_heading(desired_heading_cd, turn_rate);
     } else {
-        // retrieve turn rate from waypoint controller
+        // retrieve turn rate from waypoint controller 从航路点控制器检索转弯率
         float desired_turn_rate_rads = g2.wp_nav.get_turn_rate_rads();
 
         // if simple avoidance is active at very low speed do not attempt to turn
+        //如果在非常低的速度下激活了简单的避让，不要试图转弯
         if (g2.avoid.limits_active() && (fabsf(attitude_control.get_desired_speed()) <= attitude_control.get_stop_speed())) {
             desired_turn_rate_rads = 0.0f;
         }
 
-        // call turn rate steering controller
+        // call turn rate steering controller 呼叫转弯率转向控制器
         calc_steering_from_turn_rate(desired_turn_rate_rads);
     }
 }

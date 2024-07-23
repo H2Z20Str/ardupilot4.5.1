@@ -279,7 +279,7 @@ public:
     void nav_script_time_done(uint16_t id);
 
     AP_Mission mission{
-        FUNCTOR_BIND_MEMBER(&ModeAuto::start_command, bool, const AP_Mission::Mission_Command&),
+        FUNCTOR_BIND_MEMBER(&ModeAuto::start_command1, bool, const AP_Mission::Mission_Command&),
         FUNCTOR_BIND_MEMBER(&ModeAuto::verify_command_callback, bool, const AP_Mission::Mission_Command&),
         FUNCTOR_BIND_MEMBER(&ModeAuto::exit_mission, void)};
 
@@ -296,14 +296,14 @@ protected:
     void _exit() override;
 
     enum SubMode: uint8_t {
-        WP,                // drive to a given location
-        HeadingAndSpeed,   // turn to a given heading
-        RTL,               // perform RTL within auto mode
+        WP,                // drive to a given location 将车开到指定位置
+        HeadingAndSpeed,   // turn to a given heading 转向给定的航向
+        RTL,               // perform RTL within auto mode 在自动模式下执行RTL
         Loiter,            // perform Loiter within auto mode
-        Guided,            // handover control to external navigation system from within auto mode
-        Stop,              // stop the vehicle as quickly as possible
-        NavScriptTime,     // accept targets from lua scripts while NAV_SCRIPT_TIME commands are executing
-        Circle,            // circle a given location
+        Guided,            // handover control to external navigation system from within auto mode 从自动模式切换到外部导航系统的控制
+        Stop,              // stop the vehicle as quickly as possible 尽快停车
+        NavScriptTime,     // accept targets from lua scripts while NAV_SCRIPT_TIME commands are executing 在NAV_SCRIPT_TIME命令执行时接受lua脚本中的目标
+        Circle,            // circle a given location 圈出给定的位置
     } _submode;
 
 private:
@@ -314,7 +314,7 @@ private:
     void start_stop();
     void send_guided_position_target();
 
-    bool start_command(const AP_Mission::Mission_Command& cmd);
+    bool start_command1(const AP_Mission::Mission_Command& cmd);
     void exit_mission();
     bool verify_command_callback(const AP_Mission::Mission_Command& cmd);
 

@@ -41,18 +41,23 @@ public:
 
     // set desired location and (optionally) next_destination
     // next_destination should be provided if known to allow smooth cornering
+    //设置所需位置和（可选）下一个目的地
+    //如果已知，应提供下一个目的地，以实现平稳转弯
     virtual bool set_desired_location(const Location &destination, Location next_destination = Location()) WARN_IF_UNUSED;
 
-    // set desired location to a reasonable stopping point, return true on success
+    // set desired location to a reasonable stopping point, return true on success 将所需位置设置为合理的停止点，成功后返回true
     bool set_desired_location_to_stopping_location()  WARN_IF_UNUSED;
 
-    // set desired location as offset from the EKF origin, return true on success
+    // set desired location as offset from the EKF origin, return true on success 将所需位置设置为距EKF原点的偏移，成功时返回true
     bool set_desired_location_NED(const Vector3f& destination) WARN_IF_UNUSED;
     bool set_desired_location_NED(const Vector3f &destination, const Vector3f &next_destination) WARN_IF_UNUSED;
 
     // set desired location but expect the destination to be updated again in the near future
     // position controller input shaping will be used for navigation instead of scurves
     // Note: object avoidance is not supported if this method is used
+    //设置所需位置，但希望在不久的将来再次更新目的地
+    //位置控制器输入整形将用于导航，而不是scurves
+    //注意：如果使用此方法，则不支持对象回避
     bool set_desired_location_expect_fast_update(const Location &destination) WARN_IF_UNUSED;
 
     // true if vehicle has reached desired location. defaults to true because this is normally used by missions and we do not want the mission to become stuck
@@ -167,7 +172,7 @@ protected:
     // variables for navigation
     uint32_t _last_update_ms;       // system time of last call to update
     Location _origin;               // origin Location (vehicle will travel from the origin to the destination)
-    Location _destination;          // destination Location when in Guided_WP
+    Location _destination;          // destination Location when in Guided_WP 在Guided_WP中时的目的地位置
     Location _next_destination;     // next destination Location when in Guided_WP
     bool _orig_and_dest_valid;      // true if the origin and destination have been set
     bool _reversed;                 // execute the mission by backing up

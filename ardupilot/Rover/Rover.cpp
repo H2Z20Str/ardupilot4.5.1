@@ -346,14 +346,17 @@ typedef struct
 KFP KFP_height={0.02,0,0,0,0.001,0.543};
 KFP KFP_height2={0.02,0,0,0,0.001,0.243};
 
-int old=0;
+int old=0,bat_old=0;
+unsigned char rtl_flag=0;
+float vel_speed_radius=0;
+unsigned char battery_rtl=20; //低电量返航触发值
+
 void Rover::south_data(void)
 {
-
     hal.util->mr72_switch=g3.OA_Avoid_en; //获取避障开关
     hal.util->OA_ms=g3.OA_Avoid_ms;
     hal.util->OA_sum=g3.OA_Avoid_sum;
-
+    vel_speed_radius=g3.speed_radius;
 
 
     int32_t ms_now = AP_HAL::millis();//获取现在的时间
@@ -367,39 +370,50 @@ void Rover::south_data(void)
       unsigned char temp[10];
       char  bat_error=0;
 
-      hal.util->hzz_test[0]= g3.hzz_test;
+     // hal.util->hzz_test[0]= g3.hzz_test;
+      //
+      if(bat_old!=g3.batter_rtl)
+      {
+          bat_old=g3.batter_rtl;
+          battery_rtl=g3.batter_rtl;
+
+      }
 
       //解析测试参数
+      if(old!=g3.hzz_test) //参数更新后
+      {
       char test_hzz[13];
       sprintf((char *)test_hzz,"%d",(int)g3.hzz_test);
       int h_len=strlen(test_hzz)-1;
       int ha_len=0;
+      memset(hal.util->hzz_test,'\0',10); //先清0
        if(h_len<10)
           for(;h_len>=0;h_len--)
            {
               hal.util->hzz_test[ha_len++]=test_hzz[h_len]-'0';
            }
-
-       if(old!=g3.hzz_test) //参数更新后
-       {
            old=g3.hzz_test;
            gcs().send_text(MAV_SEVERITY_CRITICAL, "len=%d,%s",ha_len,test_hzz);
+
            for(int j=0;j<ha_len;j++)
            {
                gcs().send_text(MAV_SEVERITY_CRITICAL, "hzz_test[%d]=%d",j,hal.util->hzz_test[j]);
            }
-       }
+      }
 
 
       hal.util->DEEP_V= g3.OA_deep_v;
      // gcs().send_text(MAV_SEVERITY_CRITICAL, "%d，%d，%d",si,deep_sum,deep_sum_old);
       if(hal.util->water_deep_n>15)//@SIC,,GET,DATA.DEEP,OK,水深数据*CRC\r\n
       {
+          if(hal.util->hzz_test[3]==6)
+              gcs().send_text(MAV_SEVERITY_CRITICAL,"%s",hal.util->water_deep);
 
           //电池数据 "@SIC,,bat,%d,temp,%f,vol,%f,ele,%f\r\n"
           if(strncmp((char*)hal.util->water_deep,"@SIC,,bat,",strlen("@SIC,,bat,"))==0)//解析电池数据
           {
-           //   gcs().send_text(MAV_SEVERITY_CRITICAL,"%s",hal.util->water_deep);
+            if(hal.util->hzz_test[3]==1)
+                  gcs().send_text(MAV_SEVERITY_CRITICAL,"%s",hal.util->water_deep);
              len=strlen("@SIC,,bat,");
              unsigned char n=0;
              while(hal.util->water_deep[len]!=',')  //电量数据
@@ -463,7 +477,9 @@ void Rover::south_data(void)
              hal.util->water_deep_n=0;
              memset(hal.util->water_deep,'\0',50);
 
-           //  gcs().send_text(MAV_SEVERITY_CRITICAL, "remaining=%s! temp=%s,voltage=%s,current=%s\n",remaining,temp,voltage,current);
+           //  输出电池解析数据
+             if(hal.util->hzz_test[3]==4)
+                 gcs().send_text(MAV_SEVERITY_CRITICAL, "remaining=%s! temp=%s,voltage=%s,current=%s\n",remaining,temp,voltage,current);
 
              if(bat_error==0)
               {
@@ -473,19 +489,19 @@ void Rover::south_data(void)
                  hal.util->battery_current=atof((const char*)current);
               //   gcs().send_text(MAV_SEVERITY_CRITICAL, "%d,%.2f,%.2f,%.2f\r\n",hal.util->battery_remaining,hal.util->battery_temp,hal.util->battery_voltage,hal.util->battery_current);
               }
-
           }
           //水深数据
          else if(strncmp((char*)hal.util->water_deep,"@SIC,,GET,DATA.DEEP,OK,",strlen("@SIC,,GET,DATA.DEEP,OK,"))==0)//水深正确
          {
-         //    gcs().send_text(MAV_SEVERITY_CRITICAL,"%s",hal.util->water_deep);
+             if(hal.util->hzz_test[3]==2)
+                 gcs().send_text(MAV_SEVERITY_CRITICAL,"%s",hal.util->water_deep);
              //解析水深数据
              uint8_t n=strlen("@SIC,,GET,DATA.DEEP,OK,"),s=0;
              char deep[20];
              char deep_H[10];uint8_t H=0,flag_H=0;
              while(hal.util->water_deep[n]!='*')
              {
-                 if(hal.util->water_deep[n]=='\r'||s>=20)break;
+                 if(hal.util->water_deep[n]=='\r'||s>=10||n>41)break;
 
                  if(hal.util->water_deep[n]=='|')
                    {
@@ -507,13 +523,29 @@ void Rover::south_data(void)
              deep_H[0]='0';
              float deep_water=atof(deep);
              float deep_water_H=atof(deep_H);
-
+             hal.util->water_deep[n+3]='\0';
+             if(flag_H==0) //纯低频水深
+             {
+                 deep_water=atof(deep);
+                 deep_water_H=0;
+             }
+             else  //包含高频水深
+             {
+                 deep_water_H=atof(deep);
+                 deep_water=atof(deep_H);
+             }
              hal.util->deep_mav_L=deep_water;
              hal.util->deep_mav_H=deep_water_H;
+             hal.util->deep_log=deep_water;
+
+
+
+             if(hal.util->hzz_test[3]==5)
+                 gcs().send_text(MAV_SEVERITY_CRITICAL, "deep_water=%.2f,deep_water_H=%.2f",deep_water,deep_water_H);
 
              if(deep_water>0.1)
            {
-             //    gcs().send_text(MAV_SEVERITY_CRITICAL, "deep_water=%.2f,deep_water_H=%.2f",deep_water,deep_water_H);
+
              deep_start=deep_water;
              //1、中位值递推平均滤波：取一组数据，去除最大最小值再算平均值
 
@@ -782,7 +814,7 @@ void Rover::south_data(void)
 
 
 
-            hal.util->deep_log=deep_water;
+
 
             if(deep_water>0.1&&g3.OA_deep_en!=0) //浅水避障
              {
@@ -794,7 +826,11 @@ void Rover::south_data(void)
                     hal.util->deep_sleep_flag=1;
 
                 }
-                else hal.util->deep_sum=0,hal.util->deep_sleep_flag=0;
+                else
+                  {
+                    hal.util->deep_sum=0;
+                    hal.util->deep_sleep_flag=0;
+                  }
                 if(g3.velocity_en==10) //测试
                 {
                     if(deep_water>=deep_old && hal.util->deep_sum>=g3.velocity_en) hal.util->deep_sum=hal.util->deep_sum-g3.velocity_en/5;//船往深水走，降低避障值 逻辑需要更改
@@ -817,19 +853,21 @@ void Rover::south_data(void)
                if (control_mode->mode_number()== Mode::Number::LOITER) hal.util->deep_sum=0;//悬停模式不触发
              }
             else hal.util->deep_sum=0;
+
+            if(hal.util->deep_sum==0) hal.util->deep_sleep_flag=0;
   //         gcs().send_text(MAV_SEVERITY_CRITICAL, "k=%f,sum=%d",k,deep_sum);
   //          gcs().send_text(MAV_SEVERITY_CRITICAL, "deep_water_1=%f,deep_water_2=%f,deep_water_3=%f,deep_water_4=%f",deep_water_1,deep_water_2,deep_water_3,deep_water_4);
             deep_old=deep_water;
             deep_water=0;//水深清零
 
    //    if (should_log(MASK_LOG_SPOS))//写入日志
-//            {
-//                Log_Write_SPOS();
-//                Log_Write_south((const char *)water_deep);
-//            }
+            {
+                Log_Write_SPOS();
+                Log_Write_south((const char *)hal.util->water_deep);
+            }
 
            }
-             memset(hal.util->water_deep,'\0',40);
+             memset(hal.util->water_deep,'\0',50);
          }
           hal.util->water_deep_n=0;
           memset(hal.util->water_deep,'\0',50);
@@ -861,6 +899,32 @@ void Rover::south_data(void)
       }
       deep_sum_old=hal.util->deep_sum;
 
+      //低电量返航 每减少5%触发一次返航
+//      if(hal.util->battery_remaining>25) battery_rtl=20; //初始时，电量重置为20
+
+      if(hal.util->battery_remaining>5&&hal.util->battery_remaining<battery_rtl&&deep_old>0.7)
+      {
+          if (control_mode->mode_number()!= Mode::Number::RTL) //非返航模式时触发
+               rtl_flag++;
+          if(rtl_flag>20)//计算50次低电压
+          {
+              if( set_mode(mode_rtl, ModeReason::BATTERY_FAILSAFE))//设置返航成功！
+              {
+                  hal.util->tip=4;
+                  rtl_flag=0;
+                  battery_rtl=battery_rtl-5; //每降低5%触发一次低电量返航
+                  gcs().send_text(MAV_SEVERITY_CRITICAL, "LOW BATTERY RTL！");
+              }
+          }
+      }
+
+//      if(hal.util->battery_remaining>1&&hal.util->battery_remaining<20&&hal.util->deep_log>0.8&&rtl_flag<3) //电量小于15，水深大于0.8时触发3次返航,
+//      {
+//          if (control_mode->mode_number()!= Mode::Number::RTL) //非返航模式时触发
+//              rtl_flag++;
+//         if( set_mode(mode_rtl, ModeReason::BATTERY_FAILSAFE))
+//             gcs().send_text(MAV_SEVERITY_CRITICAL, "低电量返航！");
+//      }
 
   //    if(wp_sum==8&&wp_fllag==0)
   //    {
