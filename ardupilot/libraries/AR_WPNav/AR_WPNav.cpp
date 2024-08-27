@@ -146,7 +146,7 @@ void AR_WPNav::init(float speed_max)
     set_nudge_speed_max(0);
 }
 
-extern int wp_sum;
+//extern int wp_sum;
 float south_distance=0;
 float south_radius=0;
 // update navigation
@@ -273,6 +273,7 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
      }
     // shift this leg to previous leg
     _scurve_prev_leg = _scurve_this_leg;
+
 
     //正式
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "dt=%ld,dg=%ld",destination.lat,destination.lng);
@@ -527,7 +528,7 @@ void AR_WPNav::advance_wp_target_along_track(const Location &current_loc, float 
     Vector3f target_vel, target_accel;
 
     // update target position, velocity and acceleration
-    const float wp_radius = MAX(_radius, _turn_radius);
+    const float wp_radius = _radius;//MAX(_radius, _turn_radius);
     bool s_finished = _scurve_this_leg.advance_target_along_track(_scurve_prev_leg, _scurve_next_leg, wp_radius, _pos_control.get_lat_accel_max(), _fast_waypoint, _track_scalar_dt * dt, target_pos_3d_ftype, target_vel, target_accel);
 
     // pass new target to the position controller
@@ -536,40 +537,59 @@ void AR_WPNav::advance_wp_target_along_track(const Location &current_loc, float 
     _pos_control.set_pos_vel_accel_target(target_pos_ptype, target_vel.xy(), target_accel.xy());
 
 
-     if(hal.util->hzz_test[5]==12){
-         gcs().send_text(MAV_SEVERITY_CRITICAL, "s_finished =%d ",s_finished);
-     }
-         if(_reached_destination!=true)
-         {
-             bool near_wp = current_loc.get_distance(_destination) <= _radius;
-             if(south_wp_radius)
-                 {
-                     near_wp =current_loc.get_distance(_destination)<= 0.9; //h2z 2023.8.25，最后一个点的距离
-                     hzz_old.lat=0;
-                     hzz_old.lng=0;
-                 }
-         //    gcs().send_text(MAV_SEVERITY_CRITICAL, "south_wp_radius =%d,%f m,_radius=%f ",south_wp_radius,current_loc.get_distance(_destination),_radius);
-             const bool past_wp = current_loc.past_interval_finish_line(_origin, _destination);
-             _reached_destination = near_wp || past_wp;
-         }
+//     if(hal.util->hzz_test[5]==12){
+//         gcs().send_text(MAV_SEVERITY_CRITICAL, "s_finished =%d ",s_finished);
+//     }
+//         if(_reached_destination!=true)
+//         {
+//             bool near_wp = current_loc.get_distance(_destination) <= _radius;
+//            // gcs().send_text(MAV_SEVERITY_CRITICAL, "_destination = %.2f",current_loc.get_distance(_destination));
+//             if(south_wp_radius)
+//                 {
+//                     near_wp =current_loc.get_distance(_destination)<= 0.9; //h2z 2023.8.25，最后一个点的距离
+//                     hzz_old.lat=0;
+//                     hzz_old.lng=0;
+//                 }
+//         //    gcs().send_text(MAV_SEVERITY_CRITICAL, "south_wp_radius =%d,%f m,_radius=%f ",south_wp_radius,current_loc.get_distance(_destination),_radius);
+//             const bool past_wp = current_loc.past_interval_finish_line(_origin, _destination);
+//             _reached_destination = near_wp || past_wp;
+//         }
 
 
     // check if we've reached the waypoint 检查我们是否已到达航路点
-//    if (!_reached_destination && s_finished)
-//        // "fast" waypoints are complete once the intermediate point reaches the destination
-//        {
-//        if (_fast_waypoint) {
-//          //  gcs().send_text(MAV_SEVERITY_CRITICAL, "_reached_destination = true");
-//            _reached_destination = true;
-//        } else {
-//            // regular waypoints also require the vehicle to be within the waypoint radius or past the "finish line"
-//            bool near_wp = current_loc.get_distance(_destination) <= _radius;
-//            if(south_wp_radius)near_wp =current_loc.get_distance(_destination)<= 1.3; //h2z 2023.8.25，最后一个点的距离
-//        //    gcs().send_text(MAV_SEVERITY_CRITICAL, "south_wp_radius =%d,%f m,_radius=%f ",south_wp_radius,current_loc.get_distance(_destination),_radius);
-//            const bool past_wp = current_loc.past_interval_finish_line(_origin, _destination);
-//            _reached_destination = near_wp || past_wp;
-//        }
-//     }
+    if (!_reached_destination && s_finished)
+        // "fast" waypoints are complete once the intermediate point reaches the destination
+        {
+        if (_fast_waypoint) {//中间航点快速转向
+            _reached_destination = true;
+        } else {
+            // regular waypoints also require the vehicle to be within the waypoint radius or past the "finish line"
+            bool near_wp = current_loc.get_distance(_destination) <= _radius;
+            if(south_wp_radius)
+                {
+                    near_wp =current_loc.get_distance(_destination)<= 0.9; //h2z 2023.8.25，最后一个点的距离
+                    hzz_old.lat=0;
+                    hzz_old.lng=0;
+                }
+        //    gcs().send_text(MAV_SEVERITY_CRITICAL, "south_wp_radius =%d,%f m,_radius=%f ",south_wp_radius,current_loc.get_distance(_destination),_radius);
+            const bool past_wp = current_loc.past_interval_finish_line(_origin, _destination);
+            _reached_destination = near_wp || past_wp;
+        }
+     }
+    else if (!_reached_destination)
+    {
+        bool near_wp2 = current_loc.get_distance(_destination) <= _radius;
+        if(south_wp_radius)
+            {
+                near_wp2 =current_loc.get_distance(_destination)<= 0.9; //h2z 2023.8.25，最后一个点的距离
+                hzz_old.lat=0;
+                hzz_old.lng=0;
+            }
+    //    gcs().send_text(MAV_SEVERITY_CRITICAL, "south_wp_radius =%d,%f m,_radius=%f ",south_wp_radius,current_loc.get_distance(_destination),_radius);
+        const bool past_wp2 = current_loc.past_interval_finish_line(_origin, _destination);
+        _reached_destination = near_wp2 || past_wp2;
+
+    }
 
 
 }

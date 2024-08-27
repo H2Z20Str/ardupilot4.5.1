@@ -86,6 +86,7 @@ bool AP_GPS_NMEA::read(void)
 /*
   decode one character, return true if we have successfully completed a sentence, false otherwise
  */
+extern char instance_hzz;
 bool AP_GPS_NMEA::_decode(char c)
 {
     _sentence_length++;
@@ -101,7 +102,7 @@ bool AP_GPS_NMEA::_decode(char c)
           {
             buf_flag=0; //遇到换行时，结束记录
             //gga 数据存入日志
-            if (strncmp(buf_gps, "$GPGGA",strlen("$GPGGA")) == 0 || strncmp(buf_gps, "$GPZDA",strlen("$GPZDA")) == 0)
+            if((strncmp(&buf_gps[3], "ZDA",strlen("ZDA")) == 0) && buf_gps_sum>=30)// 34
             {
                 const struct log_south_RTK pkt= {
                 LOG_PACKET_HEADER_INIT(LOG_SOUT_RTK),
@@ -113,7 +114,28 @@ bool AP_GPS_NMEA::_decode(char c)
                 strncpy_noterm((char *)pkt.msg, (const char *)buf_gps, 64);
                 strncpy_noterm((char *)pkt.msg2, (const char *)&buf_gps[65],64 );//sizeof(&buf_gps[65])
                 AP::logger().WriteBlock(&pkt, sizeof(pkt));
+                if(instance_hzz==1) //外置
+                     hal.serial(2)->printf("%s\r\n",buf_gps);//串口输出数据
+              //  gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%sd\r\n",buf_gps);
             }
+            else if((strncmp(&buf_gps[3], "GGA",strlen("GGA")) == 0) && buf_gps_sum>=65 && buf_gps_sum<=100)//83
+            {
+                const struct log_south_RTK pkt= {
+                LOG_PACKET_HEADER_INIT(LOG_SOUT_RTK),
+                        time_us       :  AP_HAL::micros64(),
+                        msg  : {},
+                        msg2 : {}
+                        };
+           //     gcs().send_text(MAV_SEVERITY_CRITICAL, "k=%d\r\n",instance_hzz);
+                strncpy_noterm((char *)pkt.msg, (const char *)buf_gps, 64);
+                strncpy_noterm((char *)pkt.msg2, (const char *)&buf_gps[65],64 );//sizeof(&buf_gps[65])
+                AP::logger().WriteBlock(&pkt, sizeof(pkt));
+
+              if(instance_hzz==1) //外置rtk
+                hal.serial(2)->printf("%s\r\n",buf_gps);//串口输出数据
+                //gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%sd\r\n",buf_gps);
+            }
+
             buf_gps_sum=0;
 //            gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%sd\r\n",buf_gps);
             memset(buf_gps,'\0',256);
@@ -327,6 +349,7 @@ bool AP_GPS_NMEA::_have_new_message()
     return true;
 }
 
+char status_old=0;
 // Processes a just-completed term
 // Returns true if new sentence has just passed checksum test and is validated
 bool AP_GPS_NMEA::_term_complete()
@@ -377,24 +400,36 @@ bool AP_GPS_NMEA::_term_complete()
                 switch(_new_quality_indicator) {
                 case 0: // Fix not available or invalid
                     state.status = AP_GPS::NO_FIX;
+                    status_old=0;
                     break;
                 case 1: // GPS SPS Mode, fix valid
                     state.status = AP_GPS::GPS_OK_FIX_3D;
+                    status_old=0;
                     break;
                 case 2: // Differential GPS, SPS Mode, fix valid
                     state.status = AP_GPS::GPS_OK_FIX_3D_DGPS;
+                    status_old=0;
                     break;
                 case 3: // GPS PPS Mode, fix valid
                     state.status = AP_GPS::GPS_OK_FIX_3D;
+                    status_old=1;
                     break;
                 case 4: // Real Time Kinematic. System used in RTK mode with fixed integers
                     state.status = AP_GPS::GPS_OK_FIX_3D_RTK_FIXED;
+                    status_old=2;
                     break;
                 case 5: // Float RTK. Satellite system used in RTK mode, floating integers
                     state.status = AP_GPS::GPS_OK_FIX_3D_RTK_FLOAT;
                     break;
                 case 6: // Estimated (dead reckoning) Mode
-                    state.status = AP_GPS::NO_FIX;
+                    //惯导
+//                    if(status_old==0) //惯导前是固定或浮点则按照原本方式执行
+//                    {
+//                        state.status = AP_GPS::GPS_OK_FIX_3D;
+//                    } //单点解惯导将解状态改成单点解
+//                    else
+//                        state.status = AP_GPS::NO_FIX;
+                    state.status = AP_GPS::GPS_OK_FIX_3D;
                     break;
                 default://to maintain compatibility with MAV_GPS_INPUT and others
                     state.status = AP_GPS::GPS_OK_FIX_3D;
@@ -424,6 +459,7 @@ bool AP_GPS_NMEA::_term_complete()
                     // empty sentence
                     break;
                 }
+
                 _last_yaw_ms = now;
                 state.gps_yaw = wrap_360(_new_gps_yaw*0.01f);
                 state.have_gps_yaw = true;

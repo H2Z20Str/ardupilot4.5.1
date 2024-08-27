@@ -21,6 +21,7 @@
 #include <AP_Logger/AP_Logger.h>
 #endif
 #include "SCurve.h"
+#include <GCS_MAVLink/GCS.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <stdio.h>
@@ -486,16 +487,17 @@ void SCurve::set_destination_speed_max(float speed)
 // target_pos should be set to this segment's origin and it will be updated to the current position target
 // target_vel and target_accel are updated with new targets
 // returns true if vehicle has passed the apex of the corner
+extern float south_radius,south_distance;
 bool SCurve::advance_target_along_track(SCurve &prev_leg, SCurve &next_leg, float wp_radius, float accel_corner, bool fast_waypoint, float dt, Vector3f &target_pos, Vector3f &target_vel, Vector3f &target_accel)
 {
     prev_leg.move_to_pos_vel_accel(dt, target_pos, target_vel, target_accel);
     move_from_pos_vel_accel(dt, target_pos, target_vel, target_accel);
     bool s_finished = finished();
-
-    // check for change of leg on fast waypoint
+  //  gcs().send_text(MAV_SEVERITY_CRITICAL, "fast_waypoint=%d ",fast_waypoint);
+    // check for change of leg on fast waypoint 检查快速航路点上的航段变化
     const float time_to_destination = get_time_remaining();
-    if (fast_waypoint 
-        && is_zero(next_leg.get_time_elapsed()) 
+    if (fast_waypoint //如果车辆将在下一个航路点停车，则为true
+        && is_zero(next_leg.get_time_elapsed()) //当前经过时间为0
         && (get_time_elapsed() >= time_turn_out() - next_leg.time_turn_in()) 
         && (position_sq >= 0.25 * track.length_squared())) {
 
@@ -504,17 +506,35 @@ bool SCurve::advance_target_along_track(SCurve &prev_leg, SCurve &next_leg, floa
         move_from_time_pos_vel_accel(get_time_elapsed() + time_to_destination * 0.5f, turn_pos, turn_vel, turn_accel);
         next_leg.move_from_time_pos_vel_accel(time_to_destination * 0.5f, turn_pos, turn_vel, turn_accel);
         const float speed_min = MIN(get_speed_along_track(), next_leg.get_speed_along_track());
-        if ((get_time_remaining() < next_leg.time_end() * 0.5f) && (turn_pos.length() < wp_radius) &&
+
+                                                     //* 0.5f
+        if ((get_time_remaining() < next_leg.time_end()) && (turn_pos.length() < wp_radius) &&
              (Vector2f{turn_vel.x, turn_vel.y}.length() < speed_min) &&
-             (Vector2f{turn_accel.x, turn_accel.y}.length() < accel_corner)) {
-            next_leg.move_from_pos_vel_accel(dt, target_pos, target_vel, target_accel);
+             (Vector2f{turn_accel.x, turn_accel.y}.length() < next_leg.time_end())) {
+            next_leg.move_from_pos_vel_accel(dt, target_pos, target_vel, target_accel);//更新时间、位置速度等
         }
+
+        if(south_distance<south_radius)
+        {
+            next_leg.move_from_pos_vel_accel(dt, target_pos, target_vel, target_accel);
+            //s_finished = true;
+        }
+
     } else if (!is_zero(next_leg.get_time_elapsed())) {
         next_leg.move_from_pos_vel_accel(dt, target_pos, target_vel, target_accel);
-        if (next_leg.get_time_elapsed() >= get_time_remaining()) {
+       // gcs().send_text(MAV_SEVERITY_CRITICAL, "time=%.2f ",next_leg.get_time_elapsed());
+        if (next_leg.get_time_elapsed() >= (get_time_remaining()*0.5)) { //返回当前经过的时间,序列完成前的剩余时间
             s_finished = true;
+            //gcs().send_text(MAV_SEVERITY_CRITICAL, "s_finished ");
         }
     }
+
+//   if(south_distance<south_radius)
+//    {
+//       next_leg.move_from_pos_vel_accel(dt, target_pos, target_vel, target_accel);
+//       s_finished = true;
+//    }
+
 
     return s_finished;
 }
@@ -526,6 +546,7 @@ bool SCurve::finished() const
 }
 
 // increment time pointer and return the position, velocity and acceleration vectors relative to the origin
+//递增时间指针并返回相对于原点的位置、速度和加速度矢量
 void SCurve::move_from_pos_vel_accel(float dt, Vector3f &pos, Vector3f &vel, Vector3f &accel)
 {
     advance_time(dt);
@@ -539,6 +560,7 @@ void SCurve::move_from_pos_vel_accel(float dt, Vector3f &pos, Vector3f &vel, Vec
 }
 
 // increment time pointer and return the position, velocity and acceleration vectors relative to the destination
+//递增时间指针并返回相对于目的地的位置、速度和加速度矢量
 void SCurve::move_to_pos_vel_accel(float dt, Vector3f &pos, Vector3f &vel, Vector3f &accel)
 {
     advance_time(dt);

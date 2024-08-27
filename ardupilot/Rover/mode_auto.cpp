@@ -881,7 +881,7 @@ bool ModeAuto::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
     if (!reached_destination()) {
         return false;
     }
-
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "aaa");
     // Check if this is the first time we have noticed reaching the waypoint 检查这是否是我们第一次注意到到达该航路点
     if (!previously_reached_wp) {
         previously_reached_wp = true;// 如果我们曾经到达过该航路点，则设置为true

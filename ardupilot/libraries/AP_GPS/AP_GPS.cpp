@@ -700,6 +700,7 @@ void AP_GPS::send_blob_update(uint8_t instance)
   will fill in drivers[instance] and change state[instance].status
   from NO_GPS to NO_FIX.
  */
+
 void AP_GPS::detect_instance(uint8_t instance)
 {
     const uint32_t now = AP_HAL::millis();
@@ -725,6 +726,7 @@ void AP_GPS::detect_instance(uint8_t instance)
   run detection step for one GPS instance. If this finds a GPS then it
   will return it - otherwise nullptr
  */
+char instance_hzz=0;
 AP_GPS_Backend *AP_GPS::_detect_instance(uint8_t instance)
 {
     struct detect_state *dstate = &detect_state[instance];
@@ -839,6 +841,7 @@ AP_GPS_Backend *AP_GPS::_detect_instance(uint8_t instance)
 
     while (bytecount-- > 0) {
         const uint8_t data = _port[instance]->read();
+        instance_hzz=instance;
         (void)data;  // if all backends are compiled out then "data" is unused
 
 #if AP_GPS_UBLOX_ENABLED
