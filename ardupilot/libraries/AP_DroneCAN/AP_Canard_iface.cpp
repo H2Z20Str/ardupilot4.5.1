@@ -10,6 +10,7 @@ extern const AP_HAL::HAL& hal;
 #define LOG_TAG "DroneCANIface"
 #include <canard.h>
 #include <AP_CANManager/AP_CANSensor.h>
+#include <GCS_MAVLink/GCS.h>
 
 #define DEBUG_PKTS 0
 
@@ -326,6 +327,23 @@ void CanardInterface::update_rx_protocol_stats(int16_t res)
     }
 }
 
+
+int gMR72code=0;
+int gMR72Dist[10];
+
+typedef struct { // byte description
+uint8_t Objects_ID:8; //目标ID
+float Objects_DistLong; //目标纵向距离
+float Objects_DistLat; //目标横向距离
+float Objects_VrelLong; // 目标纵向速度
+float Objects_VrelLat; //目标横向速度
+uint8_t Objects_DynProp:8; // 目标运动属性
+uint8_t Object_Class:8; //目标分类或扇区编号 有的版本无此值
+uint8_t Objects_RCS:8; //目标RCS默认是0
+}object_dataBytes;
+
+object_dataBytes mzb;
+
 void CanardInterface::processRx() {
     AP_HAL::CANFrame rxmsg;
     for (uint8_t i=0; i<num_ifaces; i++) {
@@ -336,7 +354,7 @@ void CanardInterface::processRx() {
             bool read_select = true;
             bool write_select = false;
             ifaces[i]->select(read_select, write_select, nullptr, 0);
-            if (!read_select) { // No data pending
+            if (!read_select) { // No data pending 无待处理数据
                 break;
             }
             CanardCANFrame rx_frame {};
@@ -347,13 +365,12 @@ void CanardInterface::processRx() {
             if (ifaces[i]->receive(rxmsg, timestamp, flags) <= 0) {
                 break;
             }
-
             if (!rxmsg.isExtended()) {
                 // 11 bit frame, see if we have a handler
                 if (aux_11bit_driver != nullptr) {
                     aux_11bit_driver->handle_frame(rxmsg);
                 }
-                continue;
+               // continue;
             }
 
             rx_frame.data_len = AP_HAL::CANFrame::dlcToDataLength(rxmsg.dlc);
@@ -365,18 +382,139 @@ void CanardInterface::processRx() {
 #if CANARD_MULTI_IFACE
             rx_frame.iface_id = i;
 #endif
+            // for(int8_t ij=0;ij<8;ij++)
+            //     gcs().send_text(MAV_SEVERITY_CRITICAL, "data[%d]=%x",ij,rx_frame.data[ij]);
+
+    
+    const uint8_t source_node_id =(((rx_frame.id) >> 0U)  & 0x7FU);
+
+    //CAN解析 2024.08.28 hzz
+    {
+        //MR72
+        static uint8_t MR72PI = 0;
+        if(source_node_id==0x20)
+        {
+            if(rx_frame.data[0]==0x01&&MR72PI==0)
+                MR72PI=1;
+        }
+
+        if(MR72PI!=0)
+        {
+            if(source_node_id==0x20)
+            {
+                switch(MR72PI)
+                {
+                    case 1:
+                        gMR72code = ((int)rx_frame.data[3]<<8) + rx_frame.data[2];
+                        gMR72Dist[0] = ((int)rx_frame.data[5]<<8) + rx_frame.data[4];
+                        gMR72Dist[1] = rx_frame.data[6];
+                        break;
+                    case 2:
+                        gMR72Dist[1] += ((int)rx_frame.data[0]<<8);
+                        gMR72Dist[2] = ((int)rx_frame.data[2]<<8) + rx_frame.data[1];
+                        gMR72Dist[3] = ((int)rx_frame.data[4]<<8) + rx_frame.data[3];
+                        gMR72Dist[4] = ((int)rx_frame.data[6]<<8) + rx_frame.data[5];
+                        break;
+                    case 3:
+                        gMR72Dist[5] = ((int)rx_frame.data[1]<<8) + rx_frame.data[0];
+                        gMR72Dist[6] = ((int)rx_frame.data[3]<<8) + rx_frame.data[2];
+                        gMR72Dist[7] = ((int)rx_frame.data[5]<<8) + rx_frame.data[4];
+                        break;
+                    default:
+                        break;
+                }
+                MR72PI++;
+            }
+            if(MR72PI>=4)
+            {
+                MR72PI=0;
+
+               if(hal.util->hzz_test[0]==1)  //输出实验
+               {
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72code %d",gMR72code);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72Dist[0] %d",gMR72Dist[0]);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72Dist[1] %d",gMR72Dist[1]);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72Dist[2] %d",gMR72Dist[2]);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72Dist[3] %d",gMR72Dist[3]);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72Dist[4] %d",gMR72Dist[4]);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72Dist[5] %d",gMR72Dist[5]);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72Dist[6] %d",gMR72Dist[6]);
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72Dist[7] %d",gMR72Dist[7]);
+                }
+                //数据传输
+                for(int b=0;b<8;b++)
+                {
+                    hal.util->MR72_can[b]=(gMR72Dist[i] >= 8000)?0:gMR72Dist[b]*10;//最远距离为80m，这里的单位为cm
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "can[%d] %d cm",b,hal.util->MR72_can[b]);
+                }
+                
+
+            }
+        }
+
+        //mo zhi bi 
+        if(rx_frame.id==0x60B)
+        {
+        //      目标 ID：
+          mzb.Objects_ID=rx_frame.data[0];
+       
+        //      目标纵向距离：
+            mzb.Objects_DistLong=(rx_frame.data[1]*32 + (rx_frame.data[2]>>3))*0.2-500;
+        
+        //      目标横向距离：
+            mzb.Objects_DistLat=((rx_frame.data[2] &0x07)*256 + rx_frame.data[3]) *0.2-204.6;
+        
+        //      目标纵向速度：
+          mzb.Objects_VrelLong=(rx_frame.data[4]*4+(rx_frame.data[5]>>6))*0.25-128;
+        
+        //      目标横向速度：
+            mzb.Objects_VrelLat=((rx_frame.data[5]&0x3F)*8+(rx_frame.data[6]>>5))*0.25-64;
+       
+        //      目标动态属性：
+            mzb.Objects_DynProp=rx_frame.data[6]&0x07;
+        
+        //      RCS：
+            mzb.Objects_RCS=rx_frame.data[7]*0.5-64;
+        
+
+         if(abs(mzb.Objects_DistLat)<hal.util->mzb_width) //仅取宽度以内的障碍物
+            {
+                hal.util->mzb_DistLong=mzb.Objects_DistLong;
+                if(hal.util->hzz_test[0]==4)  //输出实验
+                   gcs().send_text(MAV_SEVERITY_CRITICAL, "i%d,y%.2fm,x%.2f m",mzb.Objects_ID,mzb.Objects_DistLong,mzb.Objects_DistLat);
+            } 
+
+          if(hal.util->hzz_test[0]==2)  //输出实验
+          {
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "目标 ID:%d    ",mzb.Objects_ID);
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "Y:%.2f m   ",mzb.Objects_DistLong);
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "X:%.2f m   ",mzb.Objects_DistLat);
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "YV:%.2f m/s     ",mzb.Objects_VrelLong);
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "XV:%.2f m/s ",mzb.Objects_VrelLat);
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "D:%d   ",mzb.Objects_DynProp);
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "RCS:%d\r\n",mzb.Objects_RCS);
+          }
+          else if(hal.util->hzz_test[0]==3)  //输出实验
+          {
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "i%d,y%.2fm,x%.2f m",mzb.Objects_ID,mzb.Objects_DistLong,mzb.Objects_DistLat);
+          }
+          
+        }
+    }
+   
+
             {
                 WITH_SEMAPHORE(_sem_rx);
 
                 const int16_t res = canardHandleRxFrame(&canard, &rx_frame, timestamp);
                 if (res == -CANARD_ERROR_RX_MISSED_START) {
-                    // this might remaining frames from a message that we don't accept, so check
+                    // this might remaining frames from a message that we don't accept, so check 这可能是我们不接受的消息中的剩余帧，因此请检查
                     uint64_t dummy_signature;
                     if (shouldAcceptTransfer(&canard,
                                         &dummy_signature,
                                         extractDataType(rx_frame.id),
                                         extractTransferType(rx_frame.id),
-                                        1)) { // doesn't matter what we pass here
+                                        1)) { // doesn't matter what we pass here 我们在这里经过什么并不重要
                         update_rx_protocol_stats(res);
                     } else {
                         protocol_stats.rx_ignored_not_wanted++;
@@ -390,6 +528,7 @@ void CanardInterface::processRx() {
 }
 
 void CanardInterface::process(uint32_t duration_ms) {
+    //gcs().send_text(MAV_SEVERITY_CRITICAL, "22222");//tong
 #if AP_TEST_DRONECAN_DRIVERS
     const uint64_t deadline = AP_HAL::micros64() + duration_ms*1000;
     while (AP_HAL::micros64() < deadline) {
@@ -399,8 +538,8 @@ void CanardInterface::process(uint32_t duration_ms) {
 #else
     const uint64_t deadline = AP_HAL::micros64() + duration_ms*1000;
     while (true) {
-        processRx();
-        processTx();
+        processRx();//接收函数
+        processTx(); //发送函数
         {
             WITH_SEMAPHORE(_sem_rx);
             WITH_SEMAPHORE(_sem_tx);

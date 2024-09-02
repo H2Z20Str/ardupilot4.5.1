@@ -65,6 +65,16 @@ public:
     uint8_t mr72_buff2[20];
     uint8_t mr72_sum2;
     uint16_t mr72_switch;
+
+    uint8_t radar_type=0; //雷达类型选择
+    int MR72_can[8];  //can口MR72雷达数据
+
+    //莫之比雷达
+    float mzb_DistLong=0;   //Y轴
+    float mzb_DistLat=0;    //X轴
+    float mzb_width=0;    //宽度限制
+    
+
     //水深数据
     uint8_t water_deep[50];     //水深数据
     uint8_t water_deep_n=0;     //水深长度

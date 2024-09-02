@@ -156,6 +156,8 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
  */
 
   //添加避障数据解析 2024.05.31 hzz
+   if(hal.util->radar_type==0) //原始串口mr72雷达
+   {
     if(hal.util->mr72_sum2>=20)
     {
         hal.util->mr72_sum2=0;
@@ -222,7 +224,75 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
         }
         memset(hal.util->mr72_buff2,'\0',20);
     }
+   }
+   else if(hal.util->radar_type==1) //can口 mr72雷达
+   {
+                if(hal.util->mr72_switch==3) //原始
+                {
+                update_sector_data(0,   hal.util->MR72_can[0]);   // d1
+                update_sector_data(45,  hal.util->MR72_can[1]);   // d2
+                update_sector_data(90,  hal.util->MR72_can[2]);   // d3
+                update_sector_data(135, hal.util->MR72_can[3]);   // d4
+                update_sector_data(180, hal.util->MR72_can[4]);  // d5
+                update_sector_data(225, hal.util->MR72_can[5]);  // d6
+                update_sector_data(270, hal.util->MR72_can[6]);  // d7
+                update_sector_data(315, hal.util->MR72_can[7]);  // d8
+                }
+                else if(hal.util->mr72_switch==1)//只要正前方
+                {
+                    update_sector_data(0,   hal.util->MR72_can[0]);   // d1
+                    update_sector_data(45,  UINT16_VALUE(0xFF,  0xFF));   // d2
+                    update_sector_data(90,  UINT16_VALUE(0xFF,  0xFF));   // d3
+                    update_sector_data(135, UINT16_VALUE(0xFF,  0xFF));   // d4
+                    update_sector_data(180, UINT16_VALUE(0xFF,  0xFF));  // d5
+                    update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
+                    update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
+                    update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
+                }
+                else //所有都不要了
+                {
+                    update_sector_data(0,   UINT16_VALUE(0xFF,  0xFF));   // d1
+                    update_sector_data(45,  UINT16_VALUE(0xFF,  0xFF));   // d2
+                    update_sector_data(90,  UINT16_VALUE(0xFF,  0xFF));   // d3
+                    update_sector_data(135, UINT16_VALUE(0xFF,  0xFF));   // d4
+                    update_sector_data(180, UINT16_VALUE(0xFF,  0xFF));  // d5
+                    update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
+                    update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
+                    update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
+                }
 
+                message_count++;  
+               memset(hal.util->MR72_can,0,10);       
+
+   }
+   else if(hal.util->radar_type==2) //can 莫之比雷达
+   {
+                if(hal.util->mr72_switch==1)//只要正前方
+                {
+                    update_sector_data(0,   hal.util->mzb_DistLong*1000);   // d1
+                    update_sector_data(45,  UINT16_VALUE(0xFF,  0xFF));   // d2
+                    update_sector_data(90,  UINT16_VALUE(0xFF,  0xFF));   // d3
+                    update_sector_data(135, UINT16_VALUE(0xFF,  0xFF));   // d4
+                    update_sector_data(180, UINT16_VALUE(0xFF,  0xFF));  // d5
+                    update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
+                    update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
+                    update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
+                }
+                else //所有都不要了
+                {
+                    update_sector_data(0,   UINT16_VALUE(0xFF,  0xFF));   // d1
+                    update_sector_data(45,  UINT16_VALUE(0xFF,  0xFF));   // d2
+                    update_sector_data(90,  UINT16_VALUE(0xFF,  0xFF));   // d3
+                    update_sector_data(135, UINT16_VALUE(0xFF,  0xFF));   // d4
+                    update_sector_data(180, UINT16_VALUE(0xFF,  0xFF));  // d5
+                    update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
+                    update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
+                    update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
+                }
+
+                message_count++; 
+                hal.util->mzb_DistLong=0;//清零
+   }
 
 
 

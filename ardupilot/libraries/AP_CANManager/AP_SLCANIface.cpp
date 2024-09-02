@@ -649,7 +649,7 @@ bool SLCAN::CANIface::select(bool &read, bool &write, const AP_HAL::CANFrame* co
 {
     update_slcan_port();
     bool ret = false;
-    // When in passthrough mode select is handled through can iface
+    // When in passthrough mode select is handled through can iface 在直通模式下，通过can iface处理选择
     if (_can_iface) {
         ret = _can_iface->select(read, write, pending_tx, blocking_deadline);
     }
@@ -658,12 +658,12 @@ bool SLCAN::CANIface::select(bool &read, bool &write, const AP_HAL::CANFrame* co
         return ret;
     }
 
-    // ensure we own the UART. Locking is handled at the CAN interface level
+    // ensure we own the UART. Locking is handled at the CAN interface level 确保我们拥有UART。锁定在CAN接口级别处理
     _port->begin_locked(0, 0, 0, _serial_lock_key);
     
-    // if under passthrough, we only do send when can_iface also allows it
+    // if under passthrough, we only do send when can_iface also allows it 如果在passthrough下，我们只在can_iface也允许的情况下发送
     if (_port->available_locked(_serial_lock_key) || rx_queue_.available()) {
-        // allow for receiving messages over slcan
+        // allow for receiving messages over slcan 允许通过slcan接收消息
         read = true;
         ret = true;
     }

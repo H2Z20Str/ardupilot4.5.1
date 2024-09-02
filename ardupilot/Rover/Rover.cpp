@@ -357,7 +357,8 @@ void Rover::south_data(void)
     hal.util->OA_ms=g3.OA_Avoid_ms;
     hal.util->OA_sum=g3.OA_Avoid_sum;
     vel_speed_radius=g3.speed_radius;
-
+    hal.util->radar_type=g3.radar_type;
+    hal.util->mzb_width=g3.mzb_width;
 
     int32_t ms_now = AP_HAL::millis();//获取现在的时间
     hal.util->OA_deep_sum=g3.OA_deep_sum;

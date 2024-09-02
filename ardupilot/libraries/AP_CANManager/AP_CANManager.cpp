@@ -168,7 +168,7 @@ void AP_CANManager::init()
         // instead of a driver
 #if AP_CAN_SLCAN_ENABLED
         if (_slcan_interface.init_passthrough(i)) {
-            // we have slcan bridge setup pass that on as can iface
+            // we have slcan bridge setup pass that on as can iface 我们有slcan桥接设置，并将其传递给as-can-iface
             can_initialised = hal_mutable.can[i]->init(_interfaces[i]._bitrate, _interfaces[i]._fdbitrate*1000000, AP_HAL::CANIface::NormalMode);
             iface = &_slcan_interface;
         } else {

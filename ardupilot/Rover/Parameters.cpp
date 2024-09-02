@@ -753,7 +753,10 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
     AP_GROUPINFO("VEL_Radius_V", 20, ParametersG3, speed_radius, 0.8),
     AP_GROUPINFO("VEL_BAT_RTL", 21, ParametersG3, batter_rtl, 20),
 
+    AP_GROUPINFO("Radar_type", 22, ParametersG3, radar_type, 0),//雷达类型选择
+    AP_GROUPINFO("Radar_MZB", 23, ParametersG3, mzb_width, 0.5),//莫之比雷达宽度限制
 
+       
 
 
     AP_GROUPEND

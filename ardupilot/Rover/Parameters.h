@@ -496,6 +496,10 @@ public:
 
         AP_Int16 batter_rtl;
 
+        AP_Int16 radar_type; //雷达类型选择
+
+        AP_Float mzb_width;  //莫之比雷达宽度限制
+
 
 };
 

@@ -477,7 +477,7 @@ void AP_DroneCAN::init(uint8_t driver_index, bool enable_filters)
     node_status_msg.mode = UAVCAN_PROTOCOL_NODESTATUS_MODE_OPERATIONAL;
     node_status_msg.sub_mode = 0;
 
-    // Spin node for device discovery
+    // Spin node for device discovery 用于设备发现的自旋节点
     for (uint8_t i = 0; i < 5; i++) {
         send_node_status();
         canard_iface.process(1000);
@@ -497,7 +497,7 @@ void AP_DroneCAN::init(uint8_t driver_index, bool enable_filters)
     _initialized = true;
     debug_dronecan(AP_CANManager::LOG_INFO, "DroneCAN: init done\n\r");
 }
-
+//int can_sum;
 void AP_DroneCAN::loop(void)
 {
     while (true) {
@@ -505,20 +505,20 @@ void AP_DroneCAN::loop(void)
             hal.scheduler->delay_microseconds(1000);
             continue;
         }
-
-        canard_iface.process(1);
+       // gcs().send_text(MAV_SEVERITY_CRITICAL, "can_sum=%d",can_sum);
+        canard_iface.process(1); //注意这个函数！！
 
         safety_state_send();
         notify_state_send();
         check_parameter_callback_timeout();
         send_parameter_request();
-        send_parameter_save_request();
+        send_parameter_save_request(); //发送排队的参数保存请求。从循环调用
         send_node_status();
         _dna_server.verify_nodes();
 
 #if AP_DRONECAN_SEND_GPS && AP_GPS_DRONECAN_ENABLED
         if (option_is_set(AP_DroneCAN::Options::SEND_GNSS) && !AP_GPS_DroneCAN::instance_exists(this)) {
-            // send if enabled and this interface/driver is not used by the AP_GPS driver
+            // send if enabled and this interface/driver is not used by the AP_GPS driver 如果已启用，则发送，但AP_GPS驱动程序未使用此接口/驱动程序
             gnss_send_fix();
             gnss_send_yaw();
         }
@@ -528,7 +528,7 @@ void AP_DroneCAN::loop(void)
         hobbywing_ESC_update();
 #endif
         if (_SRV_armed_mask != 0) {
-            // we have active servos
+            // we have active servos 我们有主动伺服系统
             uint32_t now = AP_HAL::micros();
             const uint32_t servo_period_us = 1000000UL / unsigned(_servo_rate_hz.get());
             if (now - _SRV_last_send_us >= servo_period_us) {
@@ -648,10 +648,10 @@ void AP_DroneCAN::send_node_status(void)
     node_status.broadcast(node_status_msg);
 
     if (option_is_set(Options::ENABLE_STATS)) {
-        // also send protocol and can stats
+        // also send protocol and can stats 还发送协议和can统计信息
         protocol_stats.broadcast(canard_iface.protocol_stats);
 
-        // get can stats
+        // get can stats 获取can统计数据
         for (uint8_t i=0; i<canard_iface.num_ifaces; i++) {
             if (canard_iface.ifaces[i] == nullptr) {
                 continue;
@@ -941,7 +941,7 @@ void AP_DroneCAN::SRV_push_servos()
     }
 }
 
-// notify state send
+// notify state send 通知状态发送
 void AP_DroneCAN::notify_state_send()
 {
     uint32_t now = AP_HAL::millis();
@@ -1191,7 +1191,7 @@ void AP_DroneCAN::gnss_send_yaw()
 }
 #endif // AP_DRONECAN_SEND_GPS
 
-// SafetyState send
+// SafetyState send 安全状态发送
 void AP_DroneCAN::safety_state_send()
 {
     uint32_t now = AP_HAL::millis();
@@ -1201,7 +1201,7 @@ void AP_DroneCAN::safety_state_send()
     }
     _last_safety_state_ms = now;
 
-    { // handle SafetyState
+    { // handle SafetyState 处理安全状态
         ardupilot_indication_SafetyState safety_msg;
         auto state = hal.util->safety_switch_state();
         if (_SRV_armed_mask != 0 || _ESC_armed_mask != 0) {
@@ -1226,7 +1226,7 @@ void AP_DroneCAN::safety_state_send()
         }
     }
 
-    { // handle ArmingStatus
+    { // handle ArmingStatus 处理武装状态
         uavcan_equipment_safety_ArmingStatus arming_msg;
         arming_msg.status = hal.util->get_soft_armed() ? UAVCAN_EQUIPMENT_SAFETY_ARMINGSTATUS_STATUS_FULLY_ARMED :
                                                       UAVCAN_EQUIPMENT_SAFETY_ARMINGSTATUS_STATUS_DISARMED;
@@ -1463,13 +1463,13 @@ void AP_DroneCAN::handle_debug(const CanardRxTransfer& transfer, const uavcan_pr
 }
 
 /*
- check for parameter get/set response timeout
+ check for parameter get/set response timeout 检查参数get/set响应超时
 */
 void AP_DroneCAN::check_parameter_callback_timeout()
 {
     WITH_SEMAPHORE(_param_sem);
 
-    // return immediately if not waiting for get/set parameter response
+    // return immediately if not waiting for get/set parameter response 如果不等待get/set参数响应，则立即返回
     if (param_request_sent_ms == 0) {
         return;
     }
@@ -1486,6 +1486,7 @@ void AP_DroneCAN::check_parameter_callback_timeout()
 /*
   send any queued request to get/set parameter
   called from loop
+  发送任何排队的请求，以获取/设置从循环调用的参数
 */
 void AP_DroneCAN::send_parameter_request()
 {
