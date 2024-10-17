@@ -353,6 +353,22 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
     cell_mvolts[2]=hal.util->deep_mav_H*1000;
     cell_mvolts[3]=hal.util->tip;   //
 
+
+    //测试版start
+//    const int32_t ms_now = AP_HAL::millis();
+//    static int32_t time_old=0;
+//   // gcs().send_text(MAV_SEVERITY_CRITICAL, "now=%ld,%ld",ms_now,time_remaining);
+//    if(hal.util->hzz_test[0]==9&&(ms_now-time_old>=15000))//15s
+//    {
+//      static uint8_t tys=0;
+//      time_old=ms_now;
+//       cell_mvolts[3]=tys;   //
+//       if(tys++>=4)tys=0;
+//    }
+    //测试版end
+
+    cell_mvolts[4]=cell_mvolts[3]*1000;   //
+
     current=hal.util->battery_current*100;
     int8_t percentage = hal.util->battery_remaining;
 
@@ -502,6 +518,7 @@ void GCS_MAVLINK::send_rangefinder() const
 }
 #endif
 
+
 #if HAL_PROXIMITY_ENABLED
 void GCS_MAVLINK::send_proximity()
 {
@@ -514,6 +531,11 @@ void GCS_MAVLINK::send_proximity()
     const uint16_t dist_min = (uint16_t)(proximity->distance_min() * 100.0f); // minimum distance the sensor can measure in centimeters
     const uint16_t dist_max = (uint16_t)(proximity->distance_max() * 100.0f); // maximum distance the sensor can measure in centimeters
 
+//    for(uint8_t j=0;j<8;j++)
+//        ralar[j]=1.3*(j+1);
+//    ralar[7]=2.4;
+//    ralar[0]=4.7;
+//    ralar[1]=3.6;
     // send horizontal distances
     if (proximity->get_status() == AP_Proximity::Status::Good) {
         Proximity_Distance_Array dist_array;
@@ -527,21 +549,24 @@ void GCS_MAVLINK::send_proximity()
                 } else if (!(proximity_ever_valid_bitmask & (1U << i))) {
                     // we've never sent this distance out, so we don't
                     // need to send an invalid one.
-                    continue;
+                   // continue;
                 }
+              //  gcs().send_text(MAV_SEVERITY_CRITICAL, "id=%d",PROXIMITY_SENSOR_ID_START + i);
                 mavlink_msg_distance_sensor_send(
                         chan,
                         AP_HAL::millis(),                               // time since system boot
                         dist_min,                                       // minimum distance the sensor can measure in centimeters
                         dist_max,                                       // maximum distance the sensor can measure in centimeters
-                        (uint16_t)(dist_array.distance[i] * 100.0f),    // current distance reading
+                        (uint16_t)(hal.util->ralar[i]* 100.0f),//(uint16_t)(dist_array.distance[i] * 100.0f),    // current distance reading
                         MAV_DISTANCE_SENSOR_LASER,                      // type from MAV_DISTANCE_SENSOR enum
                         PROXIMITY_SENSOR_ID_START + i,                  // onboard ID of the sensor
                         dist_array.orientation[i],                      // direction the sensor faces from MAV_SENSOR_ORIENTATION enum
                         0,                                              // Measurement covariance in centimeters, 0 for unknown / invalid readings
                         0, 0, nullptr, 0);
+
             }
         }
+
     }
 
     // send upward distance
@@ -1823,6 +1848,7 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
             {
                 hal.util->mr72_sum2=mr72_n;
                 mr72_flag=0; //结束接收
+                hal.util->radar_type=0;
             }
         }
 

@@ -2121,6 +2121,7 @@ void AP_GPS::calc_blended_state(void)
             state[GPS_BLENDED_INSTANCE].num_sats = state[i].num_sats;
         }
 
+   //     gcs().send_text(MAV_SEVERITY_CRITICAL, "posx = %.2f",_antenna_offset[0].y);
         // report a blended average GPS antenna position
         Vector3f temp_antenna_offset = _antenna_offset[i];
         temp_antenna_offset *= _blend_weights[i];

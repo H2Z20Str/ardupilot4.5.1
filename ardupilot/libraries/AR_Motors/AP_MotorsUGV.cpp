@@ -300,7 +300,10 @@ float AP_MotorsUGV::get_slew_limited_throttle(float throttle, float dt) const
  */
 bool AP_MotorsUGV::have_skid_steering() const
 {
+
     return (SRV_Channels::function_assigned(SRV_Channel::k_throttleLeft) && SRV_Channels::function_assigned(SRV_Channel::k_throttleRight)) || is_omni();
+//   return (SRV_Channels::function_assigned(SRV_Channel::k_tiltMotorLeft) && SRV_Channels::function_assigned(SRV_Channel::k_tiltMotorRight)) || is_omni();
+
 }
 
 // true if the vehicle has a mainsail

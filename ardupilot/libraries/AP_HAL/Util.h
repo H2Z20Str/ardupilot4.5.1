@@ -68,6 +68,7 @@ public:
 
     uint8_t radar_type=0; //雷达类型选择
     int MR72_can[8];  //can口MR72雷达数据
+    float ralar[8];
 
     //莫之比雷达
     float mzb_DistLong=0;   //Y轴
@@ -102,7 +103,7 @@ public:
 
     uint16_t tip=0;  //提示标志：0：正常状态。1：避障绕行。2：避障跳点。3：浅水避障。4：低电量返航
 
-
+    uint8_t mode_flag=0;
     //调试使用
     uint8_t hzz_test[10];
     /*

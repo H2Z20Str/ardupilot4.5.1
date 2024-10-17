@@ -1024,27 +1024,29 @@ float AR_AttitudeControl::get_desired_speed() const
     return _desired_speed;
 }
 
-// get acceleration limited desired speed
+// get acceleration limited desired speed 获得加速度限制的期望速度
 float AR_AttitudeControl::get_desired_speed_accel_limited(float desired_speed, float dt) const
 {
     // return input value if no recent calls to speed controller
     // apply no limiting when ATC_ACCEL_MAX is set to zero
+    //如果最近没有呼叫速度控制器，则返回输入值
+    //当ATC_ACCEL_MAX设置为零时，不应用限制
     if (!speed_control_active() || !is_positive(_throttle_accel_max)) {
         return desired_speed;
     }
 
-    // sanity check dt
-    dt = constrain_float(dt, 0.0f, 1.0f);
+    // sanity check dt 健全性检查dt
+    dt = constrain_float(dt, 0.0f, 1.0f); //如果dt是数字，则返回0.0+1.0/2，限制dt在0.0到1.0之间
 
-    // use previous desired speed as basis for accel limiting
+    // use previous desired speed as basis for accel limiting 使用之前的期望速度作为加速限制的基础
     float speed_prev = _desired_speed;
 
-    // if no recent calls to speed controller limit based on current speed
+    // if no recent calls to speed controller limit based on current speed 如果最近没有根据当前速度呼叫速度控制器限制
     if (!speed_control_active()) {
         get_forward_speed(speed_prev);
     }
 
-    // acceleration limit desired speed
+    // acceleration limit desired speed 加速极限期望速度
     float speed_change_max;
     if (fabsf(desired_speed) < fabsf(_desired_speed) && is_positive(_throttle_decel_max)) {
         speed_change_max = _throttle_decel_max * dt;

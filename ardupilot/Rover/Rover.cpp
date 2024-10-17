@@ -350,18 +350,33 @@ int old=0,bat_old=0;
 unsigned char rtl_flag=0;
 float vel_speed_radius=0;
 unsigned char battery_rtl=20; //低电量返航触发值
-
+//uint8_t mode_type_old=0;
 void Rover::south_data(void)
 {
     hal.util->mr72_switch=g3.OA_Avoid_en; //获取避障开关
     hal.util->OA_ms=g3.OA_Avoid_ms;
     hal.util->OA_sum=g3.OA_Avoid_sum;
     vel_speed_radius=g3.speed_radius;
-    hal.util->radar_type=g3.radar_type;
+//    hal.util->radar_type=g3.radar_type;
     hal.util->mzb_width=g3.mzb_width;
 
     int32_t ms_now = AP_HAL::millis();//获取现在的时间
     hal.util->OA_deep_sum=g3.OA_deep_sum;
+
+//    hal.util->mode_type=control_mode->mode_number();//!= Mode::Number::RTL
+//    if(hal.util->mode_type== Mode::Number::AUTO)//本次模式为自动
+//    {
+//        if(mode_type_old==Mode::Number::MANUAL)//上一次模式为手动
+//        {
+//            hal.util->mode_flag=1;//符合变动要求
+//        }
+//    }
+//    if(hal.util->mode_type== Mode::Number::MANUAL)//本次模式为自动
+//        hal.util->mode_flag=0;//重置
+//    mode_type_old=hal.util->mode_type;//更新模式记录
+    if(control_mode->mode_number()==Mode::Number::MANUAL)
+        hal.util->mode_flag=1;//符合变动要求
+
 
       float k=0;
       int len=0;
@@ -903,6 +918,8 @@ void Rover::south_data(void)
       //低电量返航 每减少5%触发一次返航
 //      if(hal.util->battery_remaining>25) battery_rtl=20; //初始时，电量重置为20
 
+     if(g3.batter_rtl==1)
+     {
       if(hal.util->battery_remaining>5&&hal.util->battery_remaining<battery_rtl&&deep_old>0.7)
       {
           if (control_mode->mode_number()!= Mode::Number::RTL) //非返航模式时触发
@@ -918,6 +935,7 @@ void Rover::south_data(void)
               }
           }
       }
+     }
 
 //      if(hal.util->battery_remaining>1&&hal.util->battery_remaining<20&&hal.util->deep_log>0.8&&rtl_flag<3) //电量小于15，水深大于0.8时触发3次返航,
 //      {
@@ -1138,8 +1156,10 @@ void Rover::one_second_loop(void)
     set_likely_flying(hal.util->get_soft_armed());
 
     // send latest param values to wp_nav
-    g2.wp_nav.set_turn_params(g2.turn_radius, g2.motors.have_skid_steering());
-    g2.pos_control.set_turn_params(g2.turn_radius, g2.motors.have_skid_steering());
+//    g2.wp_nav.set_turn_params(g2.turn_radius, g2.motors.have_skid_steering());
+//    g2.pos_control.set_turn_params(g2.turn_radius, g2.motors.have_skid_steering());
+    g2.wp_nav.set_turn_params(g2.turn_radius, 0);
+    g2.pos_control.set_turn_params(g2.turn_radius, 0);
     g2.wheel_rate_control.set_notch_sample_rate(AP::scheduler().get_filtered_loop_rate_hz());
 }
 

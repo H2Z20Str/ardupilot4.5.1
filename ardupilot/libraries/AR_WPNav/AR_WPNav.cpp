@@ -160,15 +160,18 @@ void AR_WPNav::update(float dt)
         _desired_lat_accel = 0.0f;
         _desired_turn_rate_rads = 0.0f;
         _cross_track_error = 0;
+
         return;
     }
 
-    hal.util->auto_speed =_speed_max+0.4;//获取设定的速度
+    hal.util->auto_speed =_speed_max;//获取设定的速度
     
     if(fabs(_speed_max-speed_old) > 1e-6)
     {
         speed_old=_speed_max;
-        _base_speed_max=_speed_max;
+        if(_speed_max<3)
+            _base_speed_max=_speed_max*1.25;
+        else  _base_speed_max=_speed_max;
     }
 
     //获取距离
@@ -201,7 +204,7 @@ void AR_WPNav::update(float dt)
         }
     }
 
-    // update_steering_and_speed
+    // update_steering_and_speed 更新跟踪和速度
     update_steering_and_speed(current_loc, dt);
 }
 
@@ -329,17 +332,19 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
         // skip recalculating this leg by simply shifting next leg 通过简单地移动下一条腿跳过重新计算这条腿
         _scurve_this_leg = _scurve_next_leg;
     } else {
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "SS=%.2f",_pos_control.get_accel_max());
         _scurve_this_leg.calculate_track(Vector3f{origin_NE.x, origin_NE.y, 0.0f},              // origin
                                          Vector3f{destination_NE.x, destination_NE.y, 0.0f},    // destination
-                                         _pos_control.get_speed_max(),
+                                         (hal.util->mode_flag?_pos_control.get_speed_max()*2:_pos_control.get_speed_max()),//手动变自动第一次设定速度*2
                                          _pos_control.get_speed_max(),  // speed up (not used)
                                          _pos_control.get_speed_max(),  // speed down (not used)
                                          _pos_control.get_accel_max(),  // forward back acceleration 前后加速度
                                          _pos_control.get_accel_max(),  // vertical accel (not used) 垂直加速度
                                          AR_WPNAV_SNAP_MAX,             // snap
                                          _pos_control.get_jerk_max());
-    }
 
+    }
+    hal.util->mode_flag=0;
     // handle next destination 处理下一个目的地
     _scurve_next_leg.init();
     _fast_waypoint = false;
@@ -454,7 +459,7 @@ bool AR_WPNav::get_stopping_location(Location& stopping_loc)
     if (!AP::ahrs().get_location(current_loc)) {
         return false;
     }
-    gcs().send_text(MAV_SEVERITY_CRITICAL, "DD");
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "DD");
 
     // get current velocity vector and speed
     const Vector2f velocity = AP::ahrs().groundspeed_vector();
@@ -636,29 +641,34 @@ void AR_WPNav::update_distance_and_bearing_to_destination()
 }
 
 
-// calculate steering and speed to drive along line from origin to destination waypoint
+// calculate steering and speed to drive along line from origin to destination waypoint 计算从起点到终点航路点沿线行驶的转向和速度
 void AR_WPNav::update_steering_and_speed(const Location &current_loc, float dt)
 {
     _cross_track_error = calc_crosstrack_error(current_loc);
 
-    // update position controller
+    // update position controller 更新位置控制器
     _pos_control.set_reversed(_reversed);
     _pos_control.update(dt);
 
-    // handle pivot turns
+    // handle pivot turns 手柄枢轴转动
     if (_pivot.active()) {
-        // decelerate to zero
+        // decelerate to zero 减速至零
         _desired_speed_limited = _atc.get_desired_speed_accel_limited(0.0f, dt);
 
         _desired_heading_cd = _reversed ? wrap_360_cd(oa_wp_bearing_cd() + 18000) : oa_wp_bearing_cd();
         _desired_turn_rate_rads = is_zero(_desired_speed_limited) ? _pivot.get_turn_rate_rads(_desired_heading_cd * 0.01, dt) : 0;
         _desired_lat_accel = 0.0f;
+      // gcs().send_text(MAV_SEVERITY_CRITICAL, "_decelerate to zero");
+
     } else {
 
+     //   gcs().send_text(MAV_SEVERITY_CRITICAL, "THES 33");
 
-        _desired_speed_limited = _pos_control.get_desired_speed();
+        _desired_speed_limited = _pos_control.get_desired_speed();  //期望速度
         _desired_turn_rate_rads = _pos_control.get_desired_turn_rate_rads();
         _desired_lat_accel = _pos_control.get_desired_lat_accel();
+//        if(hal.util->hzz_test[0]==5)
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "speed =%.2f",_desired_speed_limited);
     }
 
 
@@ -749,17 +759,18 @@ void AR_WPNav::update_speed_max()
 {
     const float speed_max = MAX(_base_speed_max, _nudge_speed_max);
     // ignore calls that do not change the speed
+    //gcs().send_text(MAV_SEVERITY_CRITICAL, "111");
     if (is_equal(speed_max, _pos_control.get_speed_max())) {
         return;
     }
-
+   // gcs().send_text(MAV_SEVERITY_CRITICAL, "222");
     // protect against rapid updates 防止快速更新
     const uint32_t now_ms = AP_HAL::millis();
     if (now_ms - _last_speed_update_ms < AR_WPNAV_SPEED_UPDATE_MIN_MS) {
         return;
     }
     _last_speed_update_ms = now_ms;
-
+   // gcs().send_text(MAV_SEVERITY_CRITICAL, "333");
     // update position controller max speed 更新位置控制器最大速度
     _pos_control.set_limits(speed_max, _pos_control.get_accel_max(), _pos_control.get_lat_accel_max(), _pos_control.get_jerk_max());
 

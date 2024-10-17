@@ -149,9 +149,33 @@ void Rover::read_radio()
            hal.util->ch5_pwm=RC_Channels::rc_channel(CH_5)->get_radio_in(); //读取速度档位     
             {
              //   yaw_old=AP::ahrs().yaw_sensor;
-                if(hal.util->ch5_pwm<1200)hal.util->pwm_out1=(int16_t)g3.velocity_min_1,hal.util->pwm_out2=(int16_t)g3.velocity_min_2;
-                else if(hal.util->ch5_pwm<1600)hal.util->pwm_out1=(int16_t)g3.velocity_trim_1,hal.util->pwm_out2=(int16_t)g3.velocity_trim_2;
-                else if(hal.util->ch5_pwm<2000)hal.util->pwm_out1=(int16_t)g3.velocity_max_1,hal.util->pwm_out2=(int16_t)g3.velocity_max_2;
+                if(hal.util->ch5_pwm<1200)
+                {
+                    if(g3.velocity_min_1>1500)
+                        hal.util->pwm_out1=(int16_t)g3.velocity_min_1;
+                    else hal.util->pwm_out1=1650;
+                    if(g3.velocity_min_2>1500)
+                        hal.util->pwm_out2=(int16_t)g3.velocity_min_2;
+                    else hal.util->pwm_out2=1650;
+                }
+                else if(hal.util->ch5_pwm<1600)
+                {
+                    if(g3.velocity_trim_1>1500)
+                        hal.util->pwm_out1=(int16_t)g3.velocity_trim_1;
+                    else hal.util->pwm_out1=1750;
+                    if(g3.velocity_trim_2>1500)
+                        hal.util->pwm_out2=(int16_t)g3.velocity_trim_2;
+                    else hal.util->pwm_out2=1750;
+                }
+                else if(hal.util->ch5_pwm<2000)
+                {
+                    if(g3.velocity_max_1>1500)
+                        hal.util->pwm_out1=(int16_t)g3.velocity_max_1;
+                    else hal.util->pwm_out1=1800;
+                    if(g3.velocity_max_2>1500)
+                        hal.util->pwm_out2=(int16_t)g3.velocity_max_2;
+                    else hal.util->pwm_out2=1800;
+                }
             }
        }
     else  //非手动时的pwm

@@ -330,6 +330,7 @@ void CanardInterface::update_rx_protocol_stats(int16_t res)
 
 int gMR72code=0;
 int gMR72Dist[10];
+int MZBDist[8];
 
 typedef struct { // byte description
 uint8_t Objects_ID:8; //目标ID
@@ -428,7 +429,7 @@ void CanardInterface::processRx() {
             if(MR72PI>=4)
             {
                 MR72PI=0;
-
+                hal.util->radar_type=1;
                if(hal.util->hzz_test[0]==1)  //输出实验
                {
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "gMR72code %d",gMR72code);
@@ -445,7 +446,7 @@ void CanardInterface::processRx() {
                 for(int b=0;b<8;b++)
                 {
                     hal.util->MR72_can[b]=(gMR72Dist[i] >= 8000)?0:gMR72Dist[b]*10;//最远距离为80m，这里的单位为cm
-                    gcs().send_text(MAV_SEVERITY_CRITICAL, "can[%d] %d cm",b,hal.util->MR72_can[b]);
+
                 }
                 
 
@@ -455,6 +456,7 @@ void CanardInterface::processRx() {
         //mo zhi bi 
         if(rx_frame.id==0x60B)
         {
+            hal.util->radar_type=2;
         //      目标 ID：
           mzb.Objects_ID=rx_frame.data[0];
        
@@ -484,6 +486,28 @@ void CanardInterface::processRx() {
                    gcs().send_text(MAV_SEVERITY_CRITICAL, "i%d,y%.2fm,x%.2f m",mzb.Objects_ID,mzb.Objects_DistLong,mzb.Objects_DistLat);
             } 
 
+         int s=(int)(mzb.Objects_DistLat/hal.util->mzb_width);
+
+         switch(s)
+         {
+             case 0:MZBDist[0]=mzb.Objects_DistLong;break;
+             case 1:
+             case 2:MZBDist[1]=mzb.Objects_DistLong;break;
+             case 3:
+             case 4:MZBDist[2]=mzb.Objects_DistLong;break;
+             case 5:
+             case 6:MZBDist[3]=mzb.Objects_DistLong;break;
+             case -1:
+             case -2:MZBDist[5]=mzb.Objects_DistLong;break;
+             case -3:
+             case -4:MZBDist[6]=mzb.Objects_DistLong;break;
+             case -5:
+             case -6:MZBDist[7]=mzb.Objects_DistLong;break;
+             default:MZBDist[4]=mzb.Objects_DistLong;break;
+         }
+
+
+         MZBDist[1]=(mzb.Objects_DistLat>hal.util->mzb_width)?mzb.Objects_DistLong:0;
           if(hal.util->hzz_test[0]==2)  //输出实验
           {
                gcs().send_text(MAV_SEVERITY_CRITICAL, "目标 ID:%d    ",mzb.Objects_ID);

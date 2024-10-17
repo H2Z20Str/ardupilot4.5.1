@@ -93,7 +93,7 @@ void SCurve::calculate_track(const Vector3f &origin, const Vector3f &destination
     }
 
     track = track_temp;
-    const float track_length = track.length();
+    const float track_length = track.length();//起点到终点的距离
     if (is_zero(track_length)) {
         // avoid possible divide by zero
         delta_unit.zero();
@@ -113,39 +113,38 @@ void SCurve::calculate_track(const Vector3f &origin, const Vector3f &destination
     }
 }
 
-// set maximum velocity and re-calculate the path using these limits
+// set maximum velocity and re-calculate the path using these limits 设置最大速度，并使用这些限制重新计算路径
 void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
 {
-    // return immediately if zero length path
+    // return immediately if zero length path 如果路径长度为零，则立即返回
     if (num_segs != segments_max) {
         return;
     }
-
-    // segment accelerations can not be changed after segment creation.
+  //  gcs().send_text(MAV_SEVERITY_CRITICAL, "xy=%.2f,up=%.2f,_do=%.2f",speed_xy, speed_up,speed_down);
+    // segment accelerations can not be changed after segment creation. 分段加速度在分段创建后不能改变。
     const float track_speed_max = kinematic_limit(delta_unit, speed_xy, speed_up, fabsf(speed_down));
-
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "xy=%.2f",track_speed_max);//更改速度之后才进行调用！！
     if (is_equal(vel_max, track_speed_max)) {
-        // new speed is equal to current speed maximum so no need to change anything
+        // new speed is equal to current speed maximum so no need to change anything 新速度等于当前最大速度，因此无需更改任何内容
         return;
     }
 
     if (is_zero(track_speed_max)) {
-        // new speed is zero which is not supported
+        // new speed is zero which is not supported 新速度为零，不受支持
         return;
     }
     vel_max = track_speed_max;
-
     if (time >= segment[SEG_CONST].end_time) {
         return;
     }
 
-    // re-calculate the s-curve path based on update speeds
+    // re-calculate the s-curve path based on update speeds 基于更新速度重新计算s曲线路径
 
     const float Pend = segment[SEG_DECEL_END].end_pos;
     float Vend = MIN(vel_max, segment[SEG_DECEL_END].end_vel);
 
     if (is_zero(time)) {
-        // path has not started so we can recompute the path
+        // path has not started so we can recompute the path 路径尚未开始，因此我们可以重新计算路径
         const float Vstart = MIN(vel_max, segment[SEG_INIT].end_vel);
         num_segs = SEG_INIT;
         add_segment(num_segs, 0.0f, SegmentType::CONSTANT_JERK, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -156,10 +155,10 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
     }
 
     if ((time >= segment[SEG_ACCEL_END].end_time) && (time <= segment[SEG_SPEED_CHANGE_END].end_time)) {
-        // in the speed change phase
+        // in the speed change phase 在变速阶段 将变速阶段移至加速阶段，为进一步的速度调整提供空间
         // move speed change phase to acceleration phase to provide room for further speed adjustments
 
-        // set initial segment to last acceleration segment
+        // set initial segment to last acceleration segment /将初始段设置为最后一个加速段
         segment[SEG_INIT].seg_type = SegmentType::CONSTANT_JERK;
         segment[SEG_INIT].jerk_ref = 0.0f;
         segment[SEG_INIT].end_time = segment[SEG_ACCEL_END].end_time;
@@ -167,12 +166,12 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         segment[SEG_INIT].end_vel = segment[SEG_ACCEL_END].end_vel;
         segment[SEG_INIT].end_pos = segment[SEG_ACCEL_END].end_pos;
 
-        // move speed change segments to acceleration segments
+        // move speed change segments to acceleration segments 将变速段移动到加速段
         for (uint8_t i = SEG_INIT+1; i <= SEG_ACCEL_END; i++) {
             segment[i] = segment[i+7];
         }
 
-        // set change segments to last acceleration speed
+        // set change segments to last acceleration speed 将更改段设置为上次加速速度
         for (uint8_t i = SEG_ACCEL_END+1; i <= SEG_SPEED_CHANGE_END; i++) {
             segment[i].seg_type = SegmentType::CONSTANT_JERK;
             segment[i].jerk_ref = 0.0f;
@@ -183,10 +182,10 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         }
 
     } else if ((time > segment[SEG_SPEED_CHANGE_END].end_time) && (time <= segment[SEG_CONST].end_time)) {
-        // in the constant speed phase
+        // in the constant speed phase 在恒速阶段，用当前位置和速度覆盖加速度和速度变化阶段
         // overwrite the acceleration and speed change phases with the current position and velocity
 
-        // set initial segment to last acceleration segment
+        // set initial segment to last acceleration segment 将初始段设置为最后一个加速段
         segment[SEG_INIT].seg_type = SegmentType::CONSTANT_JERK;
         segment[SEG_INIT].jerk_ref = 0.0f;
         segment[SEG_INIT].end_time = segment[SEG_SPEED_CHANGE_END].end_time;
@@ -194,7 +193,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         segment[SEG_INIT].end_vel = segment[SEG_SPEED_CHANGE_END].end_vel;
         segment[SEG_INIT].end_pos = segment[SEG_SPEED_CHANGE_END].end_pos;
 
-        // set acceleration and change segments to current constant speed
+        // set acceleration and change segments to current constant speed 设置加速度并将分段更改为当前恒定速度
         float Jt_out, At_out, Vt_out, Pt_out;
         get_jerk_accel_vel_pos_at_time(time, Jt_out, At_out, Vt_out, Pt_out);
         for (uint8_t i = SEG_INIT+1; i <= SEG_SPEED_CHANGE_END; i++) {
@@ -207,14 +206,13 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         }
     }
 
-    // adjust the INIT and ACCEL segments for new speed
+    // adjust the INIT and ACCEL segments for new speed 调整INIT和ACCEL段以适应新速度
     if ((time <= segment[SEG_ACCEL_MAX].end_time) && is_positive(segment[SEG_ACCEL_MAX].end_time - segment[SEG_ACCEL_MAX-1].end_time) && (vel_max < segment[SEG_ACCEL_END].end_vel) && is_positive(segment[SEG_ACCEL_MAX].end_accel) ) {
         // path has not finished constant positive acceleration segment
-        // reduce velocity as close to target velocity as possible
-
+        // reduce velocity as close to target velocity as possible 路径尚未完成恒正加速段，将速度降至尽可能接近目标速度
         const float Vstart = segment[SEG_INIT].end_vel;
 
-        // minimum velocity that can be obtained by shortening SEG_ACCEL_MAX
+        // minimum velocity that can be obtained by shortening SEG_ACCEL_MAX 通过缩短SEG_ACEL_MAX可以获得的最小速度
         const float Vmin = segment[SEG_ACCEL_END].end_vel - segment[SEG_ACCEL_MAX].end_accel * (segment[SEG_ACCEL_MAX].end_time - MAX(time, segment[SEG_ACCEL_MAX-1].end_time));
 
         float Jm, tj, t2, t4, t6;
@@ -225,19 +223,18 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         add_segment_const_jerk(seg, t4, 0.0f);
         add_segments_jerk(seg, tj, -Jm, t6);
 
-        // remove numerical errors
+        // remove numerical errors 消除数值误差
         segment[SEG_ACCEL_END].end_accel = 0.0f;
 
-        // add empty speed adjust segments
+        // add empty speed adjust segments 添加空速度调节段
         for (uint8_t i = SEG_ACCEL_END+1; i <= SEG_CONST; i++) {
             segment[i].seg_type = SegmentType::CONSTANT_JERK;
             segment[i].jerk_ref = 0.0f;
             segment[i].end_time = segment[SEG_ACCEL_END].end_time;
             segment[i].end_accel = 0.0f;
-            segment[i].end_vel = segment[SEG_ACCEL_END].end_vel;
+            segment[i].end_vel = segment[SEG_ACCEL_END].end_vel; //好像没起
             segment[i].end_pos = segment[SEG_ACCEL_END].end_pos;
         }
-
         calculate_path(snap_max, jerk_max, 0.0f, accel_max, MAX(Vmin, vel_max), Pend * 0.5f, Jm, tj, t2, t4, t6);
 
         seg = SEG_CONST + 1;
@@ -249,7 +246,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         segment[SEG_DECEL_END].end_accel = 0.0f;
         segment[SEG_DECEL_END].end_vel = MAX(0.0f, segment[SEG_DECEL_END].end_vel);
 
-        // add to constant velocity segment to end at the correct position
+        // add to constant velocity segment to end at the correct position 添加到恒速段，以在正确位置结束
         const float dP = MAX(0.0f, Pend - segment[SEG_DECEL_END].end_pos);
         const float t15 =  dP / segment[SEG_CONST].end_vel;
         for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
@@ -259,7 +256,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
     }
 
     // adjust the speed change segments (8 to 14) for new speed
-    // start with empty speed adjust segments
+    // start with empty speed adjust segments//调整变速段（8至14）以适应新速度 从空的速度调节段开始
     for (uint8_t i = SEG_ACCEL_END+1; i <= SEG_SPEED_CHANGE_END; i++) {
         segment[i].seg_type = SegmentType::CONSTANT_JERK;
         segment[i].jerk_ref = 0.0f;
@@ -272,6 +269,10 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         // add velocity adjustment
         // check there is enough time to make velocity change
         // we use the approximation that the time will be distance/max_vel and 8 jerk segments
+        //添加速度调整
+        //检查是否有足够的时间来改变速度
+        //我们使用的近似值是时间为距离/max_vel和8个急动段
+
         const float L = segment[SEG_CONST].end_pos - segment[SEG_ACCEL_END].end_pos;
         float Jm = 0;
         float tj = 0;
@@ -280,7 +281,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         float t6 = 0;
         float jerk_time = MIN(powf((fabsf(vel_max - segment[SEG_ACCEL_END].end_vel) * M_PI) / (4 * snap_max), 1/3), jerk_max * M_PI / (2 * snap_max));
         if ((vel_max < segment[SEG_ACCEL_END].end_vel) && (jerk_time*12.0f < L/segment[SEG_ACCEL_END].end_vel)) {
-            // we have a problem here with small segments.
+            // we have a problem here with small segments. 我们这里有一个小片段的问题。
             calculate_path(snap_max, jerk_max, vel_max, accel_max, segment[SEG_ACCEL_END].end_vel, L * 0.5f, Jm, tj, t6, t4, t2);
             Jm = -Jm;
 
@@ -302,6 +303,8 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
 
     // add deceleration segments
     // earlier check should ensure that we should always have sufficient time to stop
+    //添加减速段
+    //早期的检查应该确保我们总是有足够的时间停下来
     uint8_t seg = SEG_CONST;
     Vend = MIN(Vend, segment[SEG_SPEED_CHANGE_END].end_vel);
     add_segment_const_jerk(seg, 0.0f, 0.0f);
@@ -312,7 +315,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         add_segment_const_jerk(seg, t4, 0.0f);
         add_segments_jerk(seg, tj, Jm, t2);
     } else {
-        // No deceleration is required
+        // No deceleration is required 无需减速
         for (uint8_t i = SEG_CONST+1; i <= SEG_DECEL_END; i++) {
             segment[i].seg_type = SegmentType::CONSTANT_JERK;
             segment[i].jerk_ref = 0.0f;
@@ -323,11 +326,11 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         }
     }
 
-    // remove numerical errors
+    // remove numerical errors 消除数值误差
     segment[SEG_DECEL_END].end_accel = 0.0f;
     segment[SEG_DECEL_END].end_vel = MAX(0.0f, segment[SEG_DECEL_END].end_vel);
 
-    // add to constant velocity segment to end at the correct position
+    // add to constant velocity segment to end at the correct position 添加到恒速段，以在正确位置结束
     const float dP = MAX(0.0f, Pend - segment[SEG_DECEL_END].end_pos);
     const float t15 =  dP / segment[SEG_CONST].end_vel;
     for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
@@ -335,7 +338,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         segment[i].end_pos += dP;
     }
 
-    // catch calculation errors
+    // catch calculation errors 捕获计算错误
     if (!valid()) {
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         ::printf("SCurve::set_speed_max invalid path\n");
@@ -348,6 +351,8 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
 
 // set the maximum vehicle speed at the origin
 // returns the expected speed at the origin which will always be equal or lower than speed
+//在原点设置最大车速
+//返回原点处的预期速度，该速度始终等于或低于速度
 float SCurve::set_origin_speed_max(float speed)
 {
     // if path is zero length then start speed must be zero
@@ -493,7 +498,7 @@ bool SCurve::advance_target_along_track(SCurve &prev_leg, SCurve &next_leg, floa
     prev_leg.move_to_pos_vel_accel(dt, target_pos, target_vel, target_accel);
     move_from_pos_vel_accel(dt, target_pos, target_vel, target_accel);
     bool s_finished = finished();
-  //  gcs().send_text(MAV_SEVERITY_CRITICAL, "fast_waypoint=%d ",fast_waypoint);
+    //gcs().send_text(MAV_SEVERITY_CRITICAL, "fast_waypoint=%d ",s_finished);
     // check for change of leg on fast waypoint 检查快速航路点上的航段变化
     const float time_to_destination = get_time_remaining();
     if (fast_waypoint //如果车辆将在下一个航路点停车，则为true
@@ -539,9 +544,10 @@ bool SCurve::advance_target_along_track(SCurve &prev_leg, SCurve &next_leg, floa
     return s_finished;
 }
 
-// time has reached the end of the sequence
+// time has reached the end of the sequence 时间已经到了序列的末尾
 bool SCurve::finished() const
 {
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "time=%.2f,%.2f",time,segment[7].end_time);
     return ((time >= time_end()) || (position_sq >= track.length_squared()));
 }
 
@@ -769,34 +775,70 @@ void SCurve::add_segments(float L)
     }
 
     float Jm, tj, t2, t4, t6;
-    calculate_path(snap_max, jerk_max, 0.0f, accel_max, vel_max, L * 0.5f, Jm, tj, t2, t4, t6);
+//    if(hal.util->hzz_test[4]==5)
+//    {
+//        calculate_path(snap_max, jerk_max, 0.0f, accel_max, vel_max*hal.util->hzz_test[0], L* 0.5f , Jm, tj, t2, t4, t6);//L* 0.5f
+//     //   gcs().send_text(MAV_SEVERITY_CRITICAL,"66");
+//    }
+//    else
+        calculate_path(snap_max, jerk_max, 0.0f, accel_max, vel_max, L* 0.5f , Jm, tj, t2, t4, t6);// hzz
 
-    add_segments_jerk(num_segs, tj, Jm, t2);
-    add_segment_const_jerk(num_segs, t4, 0.0f);
-    add_segments_jerk(num_segs, tj, -Jm, t6);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "s=%.2f,j=%.2fv=%.2f,l=%.2f,jm=%.2f,tj=%.2f,t2=%.2f,t4=%.2f,t6=%.2f",snap_max,jerk_max,vel_max,L,Jm,tj,t2,t4,t6);
+
+    add_segments_jerk(num_segs, tj, Jm, t2);//1-3
+    add_segment_const_jerk(num_segs, t4, 0.0f);//1,4
+    add_segments_jerk(num_segs, tj, -Jm, t6);//3,5-7
+
 
     // remove numerical errors
     segment[SEG_ACCEL_END].end_accel = 0.0f;
 
     // add empty speed adjust segments
-    add_segment_const_jerk(num_segs, 0.0f, 0.0f);
-    add_segment_const_jerk(num_segs, 0.0f, 0.0f);
-    add_segment_const_jerk(num_segs, 0.0f, 0.0f);
-    add_segment_const_jerk(num_segs, 0.0f, 0.0f);
-    add_segment_const_jerk(num_segs, 0.0f, 0.0f);
-    add_segment_const_jerk(num_segs, 0.0f, 0.0f);
-    add_segment_const_jerk(num_segs, 0.0f, 0.0f);
+    add_segment_const_jerk(num_segs, 0.0f, 0.0f);//8
+    add_segment_const_jerk(num_segs, 0.0f, 0.0f);//9
+    add_segment_const_jerk(num_segs, 0.0f, 0.0f);//10
+    add_segment_const_jerk(num_segs, 0.0f, 0.0f);//11
+    add_segment_const_jerk(num_segs, 0.0f, 0.0f);//12
+    add_segment_const_jerk(num_segs, 0.0f, 0.0f);//13
+    add_segment_const_jerk(num_segs, 0.0f, 0.0f);//14
 
     const float t15 = MAX(0.0f, (L - 2.0f * segment[SEG_SPEED_CHANGE_END].end_pos) / segment[SEG_SPEED_CHANGE_END].end_vel);
-    add_segment_const_jerk(num_segs, t15, 0.0f);
+    add_segment_const_jerk(num_segs, t15, 0.0f);//15
 
-    add_segments_jerk(num_segs, tj, -Jm, t6);
-    add_segment_const_jerk(num_segs, t4, 0.0f);
-    add_segments_jerk(num_segs, tj, Jm, t2);
+    add_segments_jerk(num_segs, tj, -Jm, t6);//16-18
+    add_segment_const_jerk(num_segs, t4, 0.0f);//19
+    add_segments_jerk(num_segs, tj, Jm, t2);//20-22
 
     // remove numerical errors
     segment[SEG_DECEL_END].end_accel = 0.0f;
     segment[SEG_DECEL_END].end_vel = 0.0f;
+
+//    int i=0;
+//    if(hal.util->hzz_test[1]==0)
+//    {
+//        for(i=8;i<=14;i++)
+//        {
+//            segment[i].end_vel=segment[i].end_vel;
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "%d j%.2f,t%.2f,a%.2f,v%.2f,s%.2f",i,segment[i].jerk_ref,segment[i].end_time,segment[i].end_accel,segment[i].end_vel,segment[i].end_pos);
+//        }
+//    }
+//    else if(hal.util->hzz_test[1]==1)
+//    {
+//        for(i=8;i<=15;i++)
+//        {
+//            segment[i].end_vel=segment[i].end_vel*2;
+//           // segment[i].end_accel=segment[i-7].end_accel;
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "%d j%.2f,t%.2f,a%.2f,v%.2f,s%.2f",i,segment[i].jerk_ref,segment[i].end_time,segment[i].end_accel,segment[i].end_vel,segment[i].end_pos);
+//        }
+//    }
+//    if(hal.util->hzz_test[1]==2)
+//    {
+//        for(i=15;i<=15;i++)
+//        {
+//           segment[i].end_vel=segment[i].end_vel*2;
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "%d j%.2f,t%.2f,a%.2f,v%.2f,s%.2f",i,segment[i].jerk_ref,segment[i].end_time,segment[i].end_accel,segment[i].end_vel,segment[i].end_pos);
+//        }
+//    }
 }
 
 // calculate the segment times for the trigonometric S-Curve path defined by:
@@ -834,6 +876,7 @@ void SCurve::calculate_path(float Sm, float Jm, float V0, float Am, float Vm, fl
     float At = MIN(MIN(Am, 
         (Vm - V0) / (2.0f * tj) ), 
         (L + 4.0f * V0 * tj) / (4.0f * sq(tj)) );
+    //gcs().send_text(MAV_SEVERITY_CRITICAL, "at=%.2f,tj=%.2f,s=%.2f ",At,tj,Jm * tj);
     if (fabsf(At) < Jm * tj) {
         if (is_zero(V0)) {
             // we do not have a solution for non-zero initial velocity
@@ -861,7 +904,7 @@ void SCurve::calculate_path(float Sm, float Jm, float V0, float Am, float Vm, fl
             t6_out = 0.0f;
         }
     } else {
-        if ((Vm < V0 + Am * tj + (Am * Am) / Jm) || (L < 1.0f / (Jm * Jm) * (Am * Am * Am + Am * Jm * (V0 * 2.0f + Am * tj * 2.0f)) + V0 * tj * 2.0f + Am * (tj * tj))) {
+        if (((Vm) < V0 + Am * tj + (Am * Am) / Jm) || (L < 1.0f / (Jm * Jm) * (Am * Am * Am + Am * Jm * (V0 * 2.0f + Am * tj * 2.0f)) + V0 * tj * 2.0f + Am * (tj * tj))) {
             // solution = 5 - t6 t4 t2 = 1 0 1
             Am = MIN(MIN(Am, MAX(Jm * (tj + safe_sqrt((V0 * -4.0f + Vm * 4.0f + Jm * (tj * tj)) / Jm)) * (-1.0f / 2.0f), Jm * (tj - safe_sqrt((V0 * -4.0f + Vm * 4.0f + Jm * (tj * tj)) / Jm)) * (-1.0f / 2.0f))), Jm * tj * (-2.0f / 3.0f) + ((Jm * Jm) * (tj * tj) * (1.0f / 9.0f) - Jm * V0 * (2.0f / 3.0f)) * 1.0f / powf(safe_sqrt(powf(- (Jm * Jm) * L * (1.0f / 2.0f) + (Jm * Jm * Jm) * (tj * tj * tj) * (8.0f / 2.7E1f) - Jm * tj * ((Jm * Jm) * (tj * tj) + Jm * V0 * 2.0f) * (1.0f / 3.0f) + (Jm * Jm) * V0 * tj, 2.0f) - powf((Jm * Jm) * (tj * tj) * (1.0f / 9.0f) - Jm * V0 * (2.0f / 3.0f), 3.0f)) + (Jm * Jm) * L * (1.0f / 2.0f) - (Jm * Jm * Jm) * (tj * tj * tj) * (8.0f / 2.7E1f) + Jm * tj * ((Jm * Jm) * (tj * tj) + Jm * V0 * 2.0f) * (1.0f / 3.0f) - (Jm * Jm) * V0 * tj, 1.0f / 3.0f) + powf(safe_sqrt(powf(- (Jm * Jm) * L * (1.0f / 2.0f) + (Jm * Jm * Jm) * (tj * tj * tj) * (8.0f / 2.7E1f) - Jm * tj * ((Jm * Jm) * (tj * tj) + Jm * V0 * 2.0f) * (1.0f / 3.0f) + (Jm * Jm) * V0 * tj, 2.0f) - powf((Jm * Jm) * (tj * tj) * (1.0f / 9.0f) - Jm * V0 * (2.0f / 3.0f), 3.0f)) + (Jm * Jm) * L * (1.0f / 2.0f) - (Jm * Jm * Jm) * (tj * tj * tj) * (8.0f / 2.7E1f) + Jm * tj * ((Jm * Jm) * (tj * tj) + Jm * V0 * 2.0f) * (1.0f / 3.0f) - (Jm * Jm) * V0 * tj, 1.0f / 3.0f));
             t2_out = Am / Jm - tj;
@@ -877,7 +920,7 @@ void SCurve::calculate_path(float Sm, float Jm, float V0, float Am, float Vm, fl
     }
     tj_out = tj;
     Jm_out = Jm;
-
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "t2=%.2f,t4=%.2f,t6=%.2f",t2_out,t4_out,t6_out);
     // check outputs and reset back to zero if necessary
     if (!isfinite(Jm_out) || is_negative(Jm_out) ||
         !isfinite(tj_out) || is_negative(tj_out) ||
@@ -956,7 +999,8 @@ void SCurve::add_segments_jerk(uint8_t &index, float tj, float Jm, float Tcj)
 void SCurve::add_segment_const_jerk(uint8_t &index, float tj, float J0)
 {
     // if no time increase copy previous segment
-    if (!is_positive(tj)) {
+//    gcs().send_text(MAV_SEVERITY_CRITICAL,"aa,%d",esd);
+    if (!is_positive(tj)) { //检查tj是否大于零
         add_segment(index, segment[index - 1].end_time,
                     SegmentType::CONSTANT_JERK,
                     J0,
@@ -1001,6 +1045,7 @@ void SCurve::add_segment_incr_jerk(uint8_t &index, float tj, float Jm)
     const float V = segment[index - 1].end_vel + segment[index - 1].end_accel * tj + VT;
     const float P = segment[index - 1].end_pos + segment[index - 1].end_vel * tj + 0.5f * segment[index - 1].end_accel * sq(tj) + PT;
     add_segment(index, T, SegmentType::POSITIVE_JERK, J, A, V, P);
+
 }
 
 // generate decreasing jerk magnitude time segment based on a raised cosine profile

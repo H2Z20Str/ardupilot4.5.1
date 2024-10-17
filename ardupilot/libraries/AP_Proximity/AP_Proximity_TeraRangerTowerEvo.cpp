@@ -91,6 +91,7 @@ void AP_Proximity_TeraRangerTowerEvo::set_mode(const uint8_t *c, int length)
 //避障数据解析
 uint16_t mr72_average=UINT16_VALUE(0xFF,  0xFF);
 uint8_t mr72_s=0;
+extern int MZBDist[8];
 // check for replies from sensor, returns true if at least one message was processed
 bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
 {
@@ -184,6 +185,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                 {
                     mr72_average=mr72_average/(mr72_s+1);
                     mr72_s=0;
+
+                    hal.util->ralar[0]=(UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3]))/1000.0;
+                    hal.util->ralar[1]=(UINT16_VALUE(hal.util->mr72_buff2[4],  hal.util->mr72_buff2[5]))/1000.0;
+                    hal.util->ralar[7]=(UINT16_VALUE(hal.util->mr72_buff2[16],  hal.util->mr72_buff2[17]))/1000.0;
+
                 if(hal.util->mr72_switch==3) //原始
                 {
                 update_sector_data(0,   UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3]));   // d1
@@ -227,6 +233,9 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
    }
    else if(hal.util->radar_type==1) //can口 mr72雷达
    {
+       hal.util->ralar[0]=hal.util->MR72_can[0]/1000.0;
+       hal.util->ralar[1]=hal.util->MR72_can[1]/1000.0;
+       hal.util->ralar[7]=hal.util->MR72_can[7]/1000.0;
                 if(hal.util->mr72_switch==3) //原始
                 {
                 update_sector_data(0,   hal.util->MR72_can[0]);   // d1
@@ -267,7 +276,21 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
    }
    else if(hal.util->radar_type==2) //can 莫之比雷达
    {
-                if(hal.util->mr72_switch==1)//只要正前方
+       hal.util->ralar[0]=MZBDist[0];
+       hal.util->ralar[1]=MZBDist[1];
+       hal.util->ralar[7]=MZBDist[7];
+               if(hal.util->mr72_switch==3)//只要正前方
+               {
+                   update_sector_data(0,   MZBDist[0]*1000);   // d1
+                   update_sector_data(45,  MZBDist[1]*1000);   // d2
+                   update_sector_data(90,  MZBDist[2]*1000);   // d3
+                   update_sector_data(135, MZBDist[3]*1000);   // d4
+                   update_sector_data(180, MZBDist[4]*1000);  // d5
+                   update_sector_data(225, MZBDist[5]*1000);  // d6
+                   update_sector_data(270, MZBDist[6]*1000);  // d7
+                   update_sector_data(315, MZBDist[7]*1000);  // d8
+               }
+               else if(hal.util->mr72_switch==1)//只要正前方
                 {
                     update_sector_data(0,   hal.util->mzb_DistLong*1000);   // d1
                     update_sector_data(45,  UINT16_VALUE(0xFF,  0xFF));   // d2
@@ -292,6 +315,7 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
 
                 message_count++; 
                 hal.util->mzb_DistLong=0;//清零
+                memset(MZBDist,0,10);
    }
 
 
@@ -310,6 +334,8 @@ void AP_Proximity_TeraRangerTowerEvo::update_sector_data(int16_t angle_deg, uint
         frontend.boundary.set_face_attributes(face, angle_deg, ((float) distance_mm) / 1000, state.instance);
         // update OA database
         database_push(angle_deg, ((float) distance_mm) / 1000);
+
+
     } else {
         frontend.boundary.reset_face(face, state.instance);
     }

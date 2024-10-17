@@ -110,12 +110,14 @@ AR_PosControl::AR_PosControl(AR_AttitudeControl& atc) :
     AP_Param::setup_object_defaults(this, var_info);
 }
 
-extern int wp_sum;
+
 //AR_WPNav &AR_WPNav_south;    // rover position control library
 
 extern float south_distance;
 extern float south_radius;
 extern float vel_speed_radius;
+extern int wp_sum;
+extern char south_wp_radius;
 // update navigation
 void AR_PosControl::update(float dt)
 {
@@ -195,24 +197,36 @@ void AR_PosControl::update(float dt)
     // calculate minimum turn speed which is the max speed the vehicle could turn through the corner
     // given the vehicle's turn radius and half its max lateral acceleration
     // todo: remove MAX of zero when safe_sqrt fixed
-    float turn_speed_min = MAX(safe_sqrt(_atc.get_turn_lat_accel_max() * 0.5 * _turn_radius), 0);
-
-    // rotate target velocity from earth-frame to body frame
+    float turn_speed_min = MAX(safe_sqrt(_atc.get_turn_lat_accel_max() * 0.5 * _turn_radius), 0);//ATC_TURN_MAX_G,TURN_RADIUS
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "turn=%.2f",_turn_radius);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "a=%.2f",_atc.get_turn_lat_accel_max());
+    // rotate target velocity from earth-frame to body frame 将目标速度从地球坐标系旋转到身体坐标系
     const Vector2f vel_target_FR = AP::ahrs().earth_to_body2D(_vel_target);
 
-    // desired speed is normally the forward component (only) of the target velocity
+    // desired speed is normally the forward component (only) of the target velocity 期望速度通常是目标速度的前进分量（仅）
     float des_speed = vel_target_FR.x;
     if (!stopping) {
-        // do not let target speed fall below the minimum turn speed unless the vehicle is slowing down
+        // do not let target speed fall below the minimum turn speed unless the vehicle is slowing down 除非车辆正在减速，否则不要让目标速度低于最小转弯速度
         const float abs_des_speed_min = MIN(_vel_target.length(), turn_speed_min);
         if (_reversed != backing_up) {
             // if reversed or backing up desired speed will be negative
             des_speed = MIN(-abs_des_speed_min, vel_target_FR.x);
         } else {
             des_speed = MAX(abs_des_speed_min, vel_target_FR.x);
+       //     des_speed = MIN(hal.util->auto_speed, des_speed);
         }
     }
     _desired_speed = _atc.get_desired_speed_accel_limited(des_speed, dt);
+
+//    if(wp_sum!=0&&_desired_speed<(hal.util->auto_speed*0.5))//当前航点不为0，期望速度小于设定速度一半，手动变自动
+//    {
+//        _desired_speed=hal.util->auto_speed-0.4;//强制将期望速度设置成设定速度
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "12222");
+//    }
+//    if(_desired_speed>(hal.util->auto_speed*0.8))
+//    {
+//        hal.util->mode_flag=0;
+//    }
 //
 //    if(wp_sum==6||wp_sum==8)
 //      _desired_speed=1;
@@ -241,15 +255,17 @@ void AR_PosControl::update(float dt)
 //    }
 //    else if(hal.util->hzz_test[0]==2)
     {
-        if(south_distance<=(south_radius+3.5*(hal.util->auto_speed-0.4)))//减速带
+       if(south_wp_radius==0)//最后一点不减速
+       {
+        if(south_distance<=(south_radius+3.5*(hal.util->auto_speed)))//减速带
          {
-            _desired_speed=((hal.util->auto_speed-0.4)<vel_speed_radius?(hal.util->auto_speed-0.4):vel_speed_radius);
+            _desired_speed=((hal.util->auto_speed)<vel_speed_radius?(hal.util->auto_speed):vel_speed_radius);
          }
+       }
 //         else _desired_speed=(hal.util->auto_speed-0.4);
 
-         if(hal.util->deep_sleep_flag==1) _desired_speed=((hal.util->auto_speed-0.4)<hal.util->DEEP_V?(hal.util->auto_speed-0.4):hal.util->DEEP_V);//浅水避障减速
-       //  if (hal.util->bizhang_sum!=0)_base_speed_max=(_speed_max<1.2?_speed_max:0.9);//避障减速
-         if (hal.util->bizhang_sum!=0)_desired_speed=((hal.util->auto_speed-0.4)<1.2?(hal.util->auto_speed-0.4):0.9);//避障减速
+         if(hal.util->deep_sleep_flag==1) _desired_speed=((hal.util->auto_speed)<hal.util->DEEP_V?(hal.util->auto_speed):hal.util->DEEP_V);//浅水避障减速
+         if (hal.util->bizhang_sum!=0)_desired_speed=((hal.util->auto_speed)<1.2?(hal.util->auto_speed):1.2);//避障减速
 
     }
     // calculate turn rate from desired lateral acceleration
