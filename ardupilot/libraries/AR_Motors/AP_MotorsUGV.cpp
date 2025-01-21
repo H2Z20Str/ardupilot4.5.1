@@ -235,7 +235,6 @@ void AP_MotorsUGV::set_throttle(float throttle)
     if (!hal.util->get_soft_armed()) {
         return;
     }
-
     // check throttle is between -_throttle_max and  +_throttle_max
     _throttle = constrain_float(throttle, -_throttle_max, _throttle_max);
 }
@@ -311,10 +310,10 @@ bool AP_MotorsUGV::has_sail() const
 {
     return SRV_Channels::function_assigned(SRV_Channel::k_mainsail_sheet) || SRV_Channels::function_assigned(SRV_Channel::k_wingsail_elevator) || SRV_Channels::function_assigned(SRV_Channel::k_mast_rotation);
 }
-
+//h2z
 void AP_MotorsUGV::output(bool armed, float ground_speed, float dt)
 {
-    // soft-armed overrides passed in armed status
+    // soft-armed overrides passed in armed status 以武装状态通过软武装覆盖
     if (!hal.util->get_soft_armed()) {
         armed = false;
         _throttle = 0.0f;
@@ -322,30 +321,32 @@ void AP_MotorsUGV::output(bool armed, float ground_speed, float dt)
 
     // clear limit flags
     // output_ methods are responsible for setting them to true if required on each iteration
+    //清除限制标志
+    //output_方法负责在每次迭代中根据需要将其设置为true
     limit.steer_left = limit.steer_right = limit.throttle_lower = limit.throttle_upper = false;
 
-    // sanity check parameters
+    // sanity check parameters 健全性检查参数
     sanity_check_parameters();
 
-    // slew limit throttle
+    // slew limit throttle 回转限制节流阀
     slew_limit_throttle(dt);
 
-    // output for regular steering/throttle style frames
+    // output for regular steering/throttle style frames 常规转向/油门式车架的输出
     output_regular(armed, ground_speed, _steering, _throttle);
 
-    // output for skid steering style frames
+    // output for skid steering style frames 滑移转向式车架的输出
     output_skid_steering(armed, _steering, _throttle, dt);
 
-    // output for omni frames
+    // output for omni frames 全帧输出
     output_omni(armed, _steering, _throttle, _lateral);
 
-    // output to sails
+    // output to sails 输出到帆
     output_sail();
 
-    // send values to the PWM timers for output
-    SRV_Channels::calc_pwm();
+    // send values to the PWM timers for output 将值发送到PWM定时器进行输出
+    SRV_Channels::calc_pwm(); //计算所有通道的PWM
     SRV_Channels::cork();
-    SRV_Channels::output_ch_all();
+    SRV_Channels::output_ch_all(); //控制pwm输出
     SRV_Channels::push();
 }
 
@@ -1055,7 +1056,7 @@ void AP_MotorsUGV::output_sail()
 void AP_MotorsUGV::slew_limit_throttle(float dt)
 {
     const float throttle_orig = _throttle;
-    _throttle = get_slew_limited_throttle(_throttle, dt);
+    _throttle = get_slew_limited_throttle(_throttle, dt);//h2z
     if (throttle_orig > _throttle) {
         limit.throttle_upper = true;
     } else if (throttle_orig < _throttle) {
@@ -1070,7 +1071,7 @@ void AP_MotorsUGV::set_limits_from_input(bool armed, float steering, float throt
     // set limits based on inputs
     limit.steer_left |= !armed || (steering <= -4500.0f);
     limit.steer_right |= !armed || (steering >= 4500.0f);
-    limit.throttle_lower |= !armed || (throttle <= -_throttle_max);
+    limit.throttle_lower |= !armed || (throttle <= -_throttle_max);//h2z
     limit.throttle_upper |= !armed || (throttle >= _throttle_max);
 }
 

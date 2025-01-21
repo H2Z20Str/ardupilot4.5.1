@@ -20,7 +20,7 @@
 #include <AP_Logger/AP_Logger.h>
 #include "AP_OABendyRuler.h"
 #include "AP_OADijkstra.h"
-
+#include <GCS_MAVLink/GCS.h>
 extern const AP_HAL::HAL &hal;
 
 // parameter defaults

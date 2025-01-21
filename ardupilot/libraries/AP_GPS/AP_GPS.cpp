@@ -432,6 +432,7 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
     AP_GROUPINFO("2_CAN_OVRIDE", 31, AP_GPS, _override_node_id[1], 0),
 #endif // GPS_MAX_RECEIVERS > 1
 #endif // HAL_ENABLE_DRONECAN_DRIVERS
+    AP_GROUPINFO("_LOG_RTK", 32, AP_GPS, log_rtk, 1),
 
     AP_GROUPEND
 };
@@ -676,13 +677,16 @@ void AP_GPS::send_blob_start(uint8_t instance)
   send some more initialisation string bytes if there is room in the
   UART transmit buffer
  */
+unsigned char rtk_log=0;
 void AP_GPS::send_blob_update(uint8_t instance)
 {
     // exit immediately if no uart for this instance
     if (_port[instance] == nullptr) {
         return;
     }
-
+    rtk_log=log_rtk;
+//    if(log_rtk==1)
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "111111d\r\n");
     if (initblob_state[instance].remaining == 0) {
         return;
     }
@@ -1481,7 +1485,7 @@ void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
     mavlink_msg_gps_raw_int_send(
         chan,
         last_fix_time_ms(0)*(uint64_t)1000,
-        status(0),
+        status(0),          //解状态
         loc.lat,        // in 1E7 degrees
         loc.lng,        // in 1E7 degrees
         loc.alt * 10UL, // in mm
@@ -1489,7 +1493,7 @@ void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
         get_vdop(0),
         ground_speed(0)*100,  // cm/s
         ground_course(0)*100, // 1/100 degrees,
-        num_sats(0),
+        num_sats(0), //43\测试搜星数量
         height_elipsoid_mm,   // Ellipsoid height in mm
         hacc * 1000,          // one-sigma standard deviation in mm
         vacc * 1000,          // one-sigma standard deviation in mm

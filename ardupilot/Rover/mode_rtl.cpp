@@ -29,27 +29,27 @@ bool ModeRTL::_enter()
 
 void ModeRTL::update()
 {
-    // determine if we should keep navigating
+    // determine if we should keep navigating 确定我们是否应该继续航行
     if (!g2.wp_nav.reached_destination()) {
-        // update navigation controller
+        // update navigation controller 更新导航控制器
         navigate_to_waypoint();
     } else {
-        // send notification
+        // send notification发送通知
         if (send_notification) {
             send_notification = false;
             gcs().send_text(MAV_SEVERITY_INFO, "Reached destination");
         }
 
-        // we have reached the destination
-        // boats loiter, rovers stop
+        // we have reached the destination 到达目的地了
+        // boats loiter, rovers stop 船在游荡，漫游车停了下来
         if (!rover.is_boat()) {
             stop_vehicle();
         } else {
-            // if not loitering yet, start loitering
+            // if not loitering yet, start loitering 如果还没有闲逛，就开始闲逛吧
             if (!_loitering) {
                 _loitering = rover.mode_loiter.enter();
             }
-            // update stop or loiter
+            // update stop or loiter 更新停止或游荡
             if (_loitering) {
                 rover.mode_loiter.update();
             } else {
@@ -57,7 +57,7 @@ void ModeRTL::update()
             }
         }
 
-        // update distance to destination
+        // update distance to destination 更新到目的地的距离
         _distance_to_destination = rover.current_loc.get_distance(g2.wp_nav.get_destination());
     }
 }

@@ -451,6 +451,8 @@ public:
     AP_Float velocity_Kp;
     AP_Float velocity_Ki;
     AP_Float velocity_Kd;
+    AP_Int16 velocity_MV1;
+    AP_Int16 velocity_MV2;
 
 };
 
@@ -500,6 +502,9 @@ public:
         AP_Int16 radar_type; //雷达类型选择
 
         AP_Float mzb_width;  //莫之比雷达宽度限制
+
+       // AP_Int8 log_rtk; //rtk日志记录
+        AP_Int8 log_south; //水深日志记录
 
 
 };

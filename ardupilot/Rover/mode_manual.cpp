@@ -22,7 +22,10 @@ float ModeManual::PID_realize(PID *pid, float speed) {
 PID pid;
 int32_t yaw_old=0;
 //class ParametersG3 g3;
-
+int ch1_pwm=1500,ch2_pwm=1500;
+char Manual_2=0,Manual_3=0;
+int ch3_pwm_max=0;
+extern float manual_speed;
 void ModeManual::update()
 {
     float desired_steering, desired_throttle, desired_lateral;
@@ -55,14 +58,65 @@ void ModeManual::update()
     g2.motors.set_mast_rotation(desired_wingsail);
 
     // copy RC scaled inputs to outputs
-    g2.motors.set_throttle(desired_throttle);
-    g2.motors.set_steering(desired_steering, (g2.manual_options & ManualOptions::SPEED_SCALING));
-    g2.motors.set_lateral(desired_lateral);
+    g2.motors.set_throttle(desired_throttle); //油门
+    g2.motors.set_steering(desired_steering, (g2.manual_options & ManualOptions::SPEED_SCALING));//转向
+    g2.motors.set_lateral(desired_lateral);//横向
+
+
+//    g2.motors.set_throttle(75); //油门，可指定让全面输出油门
+    int ch10_pwm=RC_Channels::rc_channel(CH_10)->get_radio_in(); //读控制按键
+    int ch11_pwm=RC_Channels::rc_channel(CH_11)->get_radio_in(); //读速度控制旋钮
+    int ch3_pwm=RC_Channels::rc_channel(CH_3)->get_radio_in();//读取左油门
+    int ch6_pwm=RC_Channels::rc_channel(CH_6)->get_radio_in(); //读直线校准遥杆
+    //定速巡航 2024.12.05，start
+    {
+
+ //       gcs().send_text(MAV_SEVERITY_CRITICAL, " st=%df",ch3_pwm);
+        //手动按照定速直线航行，仅控制作用，拨动油门摇杆刹车时退出定速
+        if(ch10_pwm>=1890)//最高值时触发
+        {
+//
+//            int32_t ms_now = AP_HAL::millis();//获取现在的时间
+//            static int32_t ms_old1=0;
+//            static int ch3_pwm_old=0;
+            if(ch3_pwm>1550)//前进油门
+            {
+                Manual_3=2;//开启前摇
+//                if(ch3_pwm>=ch3_pwm_max)
+//                {
+//                    ch3_pwm_max=ch3_pwm;//取最大值
+//                }
+                if(manual_speed>0.3)
+                {
+                    if(ch6_pwm>=1800)ch3_pwm_max=1500+manual_speed*g2.velocity_MV1;//取最大值
+                    else ch3_pwm_max=1500+manual_speed*g2.velocity_MV2;//取最大值
+                }
+            }
+            if(ch3_pwm<1450&&Manual_3==1)//后退油门
+            {
+                Manual_3=0;//关闭直线控制
+                ch3_pwm_max=0;
+            }
+            if(ch3_pwm>1450&&ch3_pwm<1550&&Manual_3==2)//中值油门
+            {
+                Manual_3=1;//开启
+            }
+           // if((int)desired_throttle==0)//油门为0
+            if(Manual_3==1)
+            {
+                g2.motors.set_throttle(100); //满油门输出
+            }
+
+        }
+        else Manual_3=0;//开启直线控制
+    }
+    //定速巡航 2024.12.05，end
 
     //手动下直线校准程序 2024.05.30 hzz
-    int ch6_pwm=RC_Channels::rc_channel(CH_6)->get_radio_in(); //读方向遥杆
+
     if(ch6_pwm>=1800)
     {
+        //普通手动模式
         if(desired_throttle>0)
         {
             int yaw_change=0;
@@ -90,6 +144,35 @@ void ModeManual::update()
             else yaw_old=AP::ahrs().yaw_sensor;
         }
         else yaw_old=AP::ahrs().yaw_sensor;
+
+        //双杆模式
+        if(Manual_2==1)
+        {
+            yaw_old=AP::ahrs().yaw_sensor;
+        }
     }
     else yaw_old=AP::ahrs().yaw_sensor;
+
+
+
+    //左右对应左推进器，右油门对应右推进器
+    if(ch10_pwm>1450&&ch10_pwm<1600)//中值触发
+    {
+        float b=(ch11_pwm-1050)/900.0;
+        int s1=RC_Channels::rc_channel(CH_3)->get_radio_in();//读取左油门
+        int s2=3000-RC_Channels::rc_channel(CH_2)->get_radio_in();//读取右油门
+//         Manual_2=1;
+        if(s1>1940&&s2>1940)
+        {
+            Manual_2=2;//退出双杆控制并开启直线控制
+        }
+        else  Manual_2=1;
+        //添加速度控制
+        ch1_pwm=(int)(1500+(s1-1500)*b);
+        ch2_pwm=(int)(1500+(s2-1500)*b);
+
+
+    }
+//    else  Manual_2=0;
+
 }

@@ -712,6 +712,9 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("VEL_Ki", 59, ParametersG2, velocity_Ki, 0.2),
     AP_GROUPINFO("VEL_Kd", 60, ParametersG2, velocity_Kd, 0.0),
 
+    AP_GROUPINFO("VEL_MV1", 61, ParametersG2, velocity_MV1, 188),
+    AP_GROUPINFO("VEL_MV2", 62, ParametersG2, velocity_MV2, 148),
+
     AP_GROUPEND
 };
 
@@ -757,6 +760,10 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
     AP_GROUPINFO("Radar_MZB", 23, ParametersG3, mzb_width, 0.5),//莫之比雷达宽度限制
 
     AP_GROUPINFO("VEL_BAT_RTL", 24, ParametersG3, batter_switch, 0),
+
+    AP_GROUPINFO("LOG_SOUTH", 25, ParametersG3, log_south, 1),
+  //  AP_GROUPINFO("LOG_RTK", 26, ParametersG3, log_rtk, 1),
+
 
        
 

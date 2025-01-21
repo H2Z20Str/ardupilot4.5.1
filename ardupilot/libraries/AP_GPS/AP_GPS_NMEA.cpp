@@ -87,6 +87,7 @@ bool AP_GPS_NMEA::read(void)
   decode one character, return true if we have successfully completed a sentence, false otherwise
  */
 extern char instance_hzz;
+extern unsigned char rtk_log;
 bool AP_GPS_NMEA::_decode(char c)
 {
     _sentence_length++;
@@ -104,36 +105,49 @@ bool AP_GPS_NMEA::_decode(char c)
             //gga 数据存入日志
             if((strncmp(&buf_gps[3], "ZDA",strlen("ZDA")) == 0) && buf_gps_sum>=30)// 34
             {
-                const struct log_south_RTK pkt= {
-                LOG_PACKET_HEADER_INIT(LOG_SOUT_RTK),
-                        time_us       :  AP_HAL::micros64(),
-                        msg  : {},
-                        msg2 : {}
-                        };
+                if(rtk_log==1)
+               {
+                    const struct log_south_RTK pkt= {
+                    LOG_PACKET_HEADER_INIT(LOG_SOUT_RTK),
+                            time_us       :  AP_HAL::micros64(),
+                            msg  : {},
+                            msg2 : {}
+                           };
                // gcs().send_text(MAV_SEVERITY_CRITICAL, "k=%d\r\n",buf_gps_sum);
-                strncpy_noterm((char *)pkt.msg, (const char *)buf_gps, 64);
-                strncpy_noterm((char *)pkt.msg2, (const char *)&buf_gps[65],64 );//sizeof(&buf_gps[65])
-                AP::logger().WriteBlock(&pkt, sizeof(pkt));
+                    strncpy_noterm((char *)pkt.msg, (const char *)buf_gps, 64);
+                    strncpy_noterm((char *)pkt.msg2, (const char *)&buf_gps[65],64 );//sizeof(&buf_gps[65])
+                    AP::logger().WriteBlock(&pkt, sizeof(pkt));
+               }
                 if(instance_hzz==1) //外置
                      hal.serial(2)->printf("%s\r\n",buf_gps);//串口输出数据
               //  gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%sd\r\n",buf_gps);
             }
             else if((strncmp(&buf_gps[3], "GGA",strlen("GGA")) == 0) && buf_gps_sum>=65 && buf_gps_sum<=100)//83
             {
+
+               if(rtk_log==1)
+               {
                 const struct log_south_RTK pkt= {
                 LOG_PACKET_HEADER_INIT(LOG_SOUT_RTK),
                         time_us       :  AP_HAL::micros64(),
                         msg  : {},
                         msg2 : {}
                         };
+
            //     gcs().send_text(MAV_SEVERITY_CRITICAL, "k=%d\r\n",instance_hzz);
                 strncpy_noterm((char *)pkt.msg, (const char *)buf_gps, 64);
                 strncpy_noterm((char *)pkt.msg2, (const char *)&buf_gps[65],64 );//sizeof(&buf_gps[65])
                 AP::logger().WriteBlock(&pkt, sizeof(pkt));
-
+               }
               if(instance_hzz==1) //外置rtk
                 hal.serial(2)->printf("%s\r\n",buf_gps);//串口输出数据
-                //gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%sd\r\n",buf_gps);
+              if(hal.util->hzz_test[0]==5)
+                  gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\%s\r\n",buf_gps);
+            }
+            else if((strncmp(&buf_gps[3], "HDT",strlen("HDT")) == 0) && buf_gps_sum>=10)//
+            {
+                if(hal.util->hzz_test[0]==6)
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\%s\r\n",buf_gps);
             }
 
             buf_gps_sum=0;

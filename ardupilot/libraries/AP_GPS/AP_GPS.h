@@ -92,7 +92,7 @@ class AP_GPS
 
 public:
     AP_GPS();
-
+    AP_Int8 log_rtk;
     /* Do not allow copies */
     CLASS_NO_COPY(AP_GPS);
 

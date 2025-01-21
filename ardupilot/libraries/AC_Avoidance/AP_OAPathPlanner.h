@@ -79,6 +79,8 @@ public:
 
     uint16_t get_options() const { return _options;}
 
+    float get_margin() const { return _margin_max;}
+
     static const struct AP_Param::GroupInfo var_info[];
 
 private:

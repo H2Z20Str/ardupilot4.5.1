@@ -24,7 +24,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <GCS_MAVLink/GCS.h>
-
+#include <AC_Avoidance/AP_OAPathPlanner.h>
 extern const AP_HAL::HAL& hal;
 
 // update the state of the sensor
@@ -92,6 +92,7 @@ void AP_Proximity_TeraRangerTowerEvo::set_mode(const uint8_t *c, int length)
 uint16_t mr72_average=UINT16_VALUE(0xFF,  0xFF);
 uint8_t mr72_s=0;
 extern int MZBDist[8];
+extern char Manual_3;
 // check for replies from sensor, returns true if at least one message was processed
 bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
 {
@@ -155,7 +156,7 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
     }
 
  */
-
+    AP_OAPathPlanner *oa1 = AP_OAPathPlanner::get_singleton();
   //添加避障数据解析 2024.05.31 hzz
    if(hal.util->radar_type==0) //原始串口mr72雷达
    {
@@ -200,6 +201,12 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                 update_sector_data(225, UINT16_VALUE(hal.util->mr72_buff2[12], hal.util->mr72_buff2[13]));  // d6
                 update_sector_data(270, UINT16_VALUE(hal.util->mr72_buff2[14], hal.util->mr72_buff2[15]));  // d7
                 update_sector_data(315, UINT16_VALUE(hal.util->mr72_buff2[16], hal.util->mr72_buff2[17]));  // d8
+
+                if(Manual_3==1)
+                {
+                    if((UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3])/1000.0)< oa1->get_margin())
+                        Manual_3=0;
+                }
                 }
                 else if(hal.util->mr72_switch==1)//只要正前方
                 {
@@ -211,6 +218,12 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                     update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
                     update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
                     update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
+
+                    if(Manual_3==1)
+                    {
+                        if((UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3])/1000.0)< oa1->get_margin())
+                            Manual_3=0;
+                    }
                 }
                 else //所有都不要了
                 {
@@ -246,6 +259,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                 update_sector_data(225, hal.util->MR72_can[5]);  // d6
                 update_sector_data(270, hal.util->MR72_can[6]);  // d7
                 update_sector_data(315, hal.util->MR72_can[7]);  // d8
+                if(Manual_3==1)
+                {
+                    if(( hal.util->MR72_can[0]/1000.0)< oa1->get_margin())
+                        Manual_3=0;
+                }
                 }
                 else if(hal.util->mr72_switch==1)//只要正前方
                 {
@@ -257,6 +275,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                     update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
                     update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
                     update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
+                    if(Manual_3==1)
+                    {
+                        if((hal.util->MR72_can[0]/1000.0)< oa1->get_margin())
+                            Manual_3=0;
+                    }
                 }
                 else //所有都不要了
                 {
@@ -289,6 +312,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                    update_sector_data(225, MZBDist[5]*1000);  // d6
                    update_sector_data(270, MZBDist[6]*1000);  // d7
                    update_sector_data(315, MZBDist[7]*1000);  // d8
+                   if(Manual_3==1)
+                   {
+                       if( hal.util->mzb_DistLong>0.5&&hal.util->mzb_DistLong< oa1->get_margin())
+                           Manual_3=0;
+                   }
                }
                else if(hal.util->mr72_switch==1)//只要正前方
                 {
@@ -300,6 +328,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                     update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
                     update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
                     update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
+                    if(Manual_3==1)
+                    {
+                        if( hal.util->mzb_DistLong>0.5&&hal.util->mzb_DistLong< oa1->get_margin())
+                            Manual_3=0;
+                    }
                 }
                 else //所有都不要了
                 {

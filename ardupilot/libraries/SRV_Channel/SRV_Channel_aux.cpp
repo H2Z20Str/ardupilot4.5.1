@@ -29,14 +29,18 @@
 
 extern const AP_HAL::HAL& hal;
 
-/// map a function to a servo channel and output it
+extern int ch1_pwm,ch2_pwm;
+extern char Manual_2;
+
+//int seout=900;
+/// map a function to a servo channel and output it 将函数映射到伺服通道并输出
 void SRV_Channel::output_ch(void)
 {
 #ifndef HAL_BUILD_AP_PERIPH
     int8_t passthrough_from = -1;
     bool passthrough_mapped = false;
 
-    // take care of special function cases
+    // take care of special function cases 照顾特殊功能例
     switch(function.get())
     {
     case k_manual:              // manual
@@ -51,13 +55,13 @@ void SRV_Channel::output_ch(void)
         break;
     }
     if (passthrough_from != -1) {
-        // we are doing passthrough from input to output for this channel
+        // we are doing passthrough from input to output for this channel 我们正在为这个通道进行从输入到输出的直通
         RC_Channel *c = rc().channel(passthrough_from);
         if (c) {
             if (SRV_Channels::passthrough_disabled()) {
                 output_pwm = c->get_radio_trim();
             } else {
-                // non-mapped rc passthrough
+                // non-mapped rc passthrough 非映射rc透传
                 int16_t radio_in = c->get_radio_in();
                 if (passthrough_mapped) {
                     if (rc().has_valid_input()) {
@@ -96,9 +100,14 @@ void SRV_Channel::output_ch(void)
         }
     }
 #endif // HAL_BUILD_AP_PERIPH
-
     if (!(SRV_Channels::disabled_mask & (1U<<ch_num))) {
         hal.rcout->write(ch_num, output_pwm);
+
+        if(Manual_2==1)
+        {
+           hal.rcout->write(0, ch1_pwm);
+           hal.rcout->write(1, ch2_pwm);
+        }
     }
 }
 
@@ -114,6 +123,7 @@ void SRV_Channels::output_ch_all(void)
     }
 #endif
     for (uint8_t i = 0; i < max_chan; i++) {
+
         channels[i].output_ch();
     }
 }
@@ -257,7 +267,7 @@ void SRV_Channels::enable_aux_servos()
         else if(i==1)
            {
              c.servo_max.set(hal.util->pwm_out2);
-             c.servo_min.set(3050-hal.util->pwm_out2);
+             c.servo_min.set(3000-hal.util->pwm_out2);
            }
 
 

@@ -711,6 +711,7 @@ void RCOutput::write(uint8_t chan, uint16_t period_us)
     if (chan >= max_channels) {
         return;
     }
+ //   if(chan==1)    period_us=1750;//h2z
     last_sent[chan] = period_us;
 
 #if AP_SIM_ENABLED
@@ -723,7 +724,8 @@ void RCOutput::write(uint8_t chan, uint16_t period_us)
 #if HAL_WITH_IO_MCU
     // handle IO MCU channels
     if (iomcu_enabled) {
-        iomcu.write_channel(chan, period_us);
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "2,%d",chan);
+        iomcu.write_channel(chan, period_us); //在这里输出了？
     }
 #endif
     if (chan < chan_offset) {
@@ -738,7 +740,7 @@ void RCOutput::write(uint8_t chan, uint16_t period_us)
     chan -= chan_offset;
 
     period[chan] = period_us;
-
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "chan,%d,%d",chan,num_fmu_channels);
     if (chan < num_fmu_channels) {
         active_fmu_channels = MAX(chan+1, active_fmu_channels);
         if (!corked) {

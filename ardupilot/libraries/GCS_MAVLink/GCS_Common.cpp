@@ -3254,6 +3254,8 @@ float GCS_MAVLINK::vfr_hud_alt() const
     return global_position_current_loc.alt * 0.01f; // cm -> m
 }
 
+float manual_speed=0;
+extern char Manual_3;
 void GCS_MAVLINK::send_vfr_hud()
 {
 #if AP_AHRS_ENABLED
@@ -3261,7 +3263,9 @@ void GCS_MAVLINK::send_vfr_hud()
 
     // return values ignored; we send stale data
     UNUSED_RESULT(ahrs.get_location(global_position_current_loc));
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, " hzz1=%.2f",vfr_hud_airspeed());
 
+    if(Manual_3==2)manual_speed=vfr_hud_airspeed();
     mavlink_msg_vfr_hud_send(
         chan,
         vfr_hud_airspeed(),

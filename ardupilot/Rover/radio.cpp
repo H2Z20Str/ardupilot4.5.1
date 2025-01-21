@@ -125,6 +125,10 @@ void Rover::rudder_arm_disarm_check()
     }
 }
 
+extern int ch1_pwm,ch2_pwm;
+extern char Manual_2,Manual_3;
+extern int ch3_pwm_max;
+char Manual_3_v=0;
 
 void Rover::read_radio()
 {
@@ -157,6 +161,11 @@ void Rover::read_radio()
                     if(g3.velocity_min_2>1500)
                         hal.util->pwm_out2=(int16_t)g3.velocity_min_2;
                     else hal.util->pwm_out2=1650;
+                    if(Manual_3==2)
+                    {
+                        if(ch3_pwm_max>g3.velocity_min_1)ch3_pwm_max=g3.velocity_min_1;
+                    }
+                    Manual_3_v=(Manual_3_v&0xf0)|(0x01<<0);
                 }
                 else if(hal.util->ch5_pwm<1600)
                 {
@@ -166,6 +175,11 @@ void Rover::read_radio()
                     if(g3.velocity_trim_2>1500)
                         hal.util->pwm_out2=(int16_t)g3.velocity_trim_2;
                     else hal.util->pwm_out2=1750;
+                    if(Manual_3==2)
+                    {
+                        if(ch3_pwm_max>g3.velocity_trim_1)ch3_pwm_max=g3.velocity_trim_1;
+                    }
+                    Manual_3_v=(Manual_3_v&0xf0)|(0x01<<1);
                 }
                 else if(hal.util->ch5_pwm<2000)
                 {
@@ -175,6 +189,46 @@ void Rover::read_radio()
                     if(g3.velocity_max_2>1500)
                         hal.util->pwm_out2=(int16_t)g3.velocity_max_2;
                     else hal.util->pwm_out2=1800;
+                    if(Manual_3==2)
+                    {
+                        if(ch3_pwm_max>g3.velocity_max_1)ch3_pwm_max=g3.velocity_max_1;
+                    }
+                    Manual_3_v=(Manual_3_v&0xf0)|(0x01<<2);
+                }
+                if(Manual_2==2)
+                {
+                    hal.util->pwm_out1=ch1_pwm;
+                    hal.util->pwm_out2=ch2_pwm;
+                }
+                if(Manual_3==1)
+               {
+                    hal.util->pwm_out1=hal.util->pwm_out2=ch3_pwm_max;
+
+                    int ch14_pwm=RC_Channels::rc_channel(CH_14)->get_radio_in();
+                    int32_t ms_now = AP_HAL::millis();//获取现在的时间
+                    static int32_t ms_old1=0;
+                    if((ch14_pwm>1900&&(Manual_3_v&0xf0)==0x00)||((ms_now-ms_old1)>500&&(Manual_3_v&0xf0)==0x10))
+                    {
+                        ms_old1=ms_now;
+                        Manual_3_v=(Manual_3_v&0x0f)|0x10;
+                        ch3_pwm_max+=(Manual_3_v&0x0f)*10;
+                        if(ch3_pwm_max>g3.velocity_max_1)ch3_pwm_max=g3.velocity_max_1;
+                    }
+                    else if((ch14_pwm<1200&&(Manual_3_v&0xf0)==0x00)||((ms_now-ms_old1)>500&&(Manual_3_v&0xf0)==0x20))
+                    {
+                        ms_old1=ms_now;
+                        Manual_3_v=(Manual_3_v&0x0f)|0x20;
+                        ch3_pwm_max -=(Manual_3_v&0x0f)*10;
+                        if(ch3_pwm_max<1550)ch3_pwm_max=1550;
+                    }
+                    else if(ch14_pwm<1550&&ch14_pwm>1450)
+                    {
+                        ms_old1=ms_now;
+                        Manual_3_v=Manual_3_v&0x0f;
+                    }
+
+                   // gcs().send_text(MAV_SEVERITY_CRITICAL, " st=0x%02x",Manual_3_v);
+                            //(int)(1500+(RC_Channels::rc_channel(CH_11)->get_radio_in()-1050)/1.8); //读速度控制旋钮
                 }
             }
        }
