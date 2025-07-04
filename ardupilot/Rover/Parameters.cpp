@@ -737,7 +737,6 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
     AP_GROUPINFO("VEL_TRIM_1", 9, ParametersG3, velocity_trim_1, 1880),//中速4m/s
     AP_GROUPINFO("VEL_MIN_1", 10, ParametersG3, velocity_min_1, 1780),//低速2m/s
 
-    
 
     AP_GROUPINFO("VEL_AUTO_1", 11, ParametersG3, velocity_auto_1, 148),//切换速度控制通道，0是SW1,1是AUX1
 
@@ -763,6 +762,10 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
 
     AP_GROUPINFO("LOG_SOUTH", 25, ParametersG3, log_south, 1),
   //  AP_GROUPINFO("LOG_RTK", 26, ParametersG3, log_rtk, 1),
+
+    AP_GROUPINFO("POS_SUM", 26, ParametersG3, POS_SUM, 0),
+    //   AP_GROUPINFO("BD_OFF", 26, ParametersG3, BD_south, 1),
+
 
 
        

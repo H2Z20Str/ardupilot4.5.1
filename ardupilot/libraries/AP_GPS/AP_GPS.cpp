@@ -684,7 +684,7 @@ void AP_GPS::send_blob_update(uint8_t instance)
     if (_port[instance] == nullptr) {
         return;
     }
-    rtk_log=log_rtk;
+    rtk_log=log_rtk;//读取参数更改
 //    if(log_rtk==1)
 //        gcs().send_text(MAV_SEVERITY_CRITICAL, "111111d\r\n");
     if (initblob_state[instance].remaining == 0) {
@@ -1467,6 +1467,7 @@ uint16_t AP_GPS::gps_yaw_cdeg(uint8_t instance) const
     }
     return yaw_cd;
 }
+//extern unsigned char BD_OFF;
 
 void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
 {
@@ -1482,6 +1483,7 @@ void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
     horizontal_accuracy(0, hacc);
     vertical_accuracy(0, vacc);
     speed_accuracy(0, sacc);
+//   gcs().send_text(MAV_SEVERITY_CRITICAL, "remaining=%ld!",loc.alt * 10UL);
     mavlink_msg_gps_raw_int_send(
         chan,
         last_fix_time_ms(0)*(uint64_t)1000,
@@ -1493,7 +1495,7 @@ void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
         get_vdop(0),
         ground_speed(0)*100,  // cm/s
         ground_course(0)*100, // 1/100 degrees,
-        num_sats(0), //43\测试搜星数量
+        num_sats(0), //43\测试搜星数量,(num_sats(0)/1.6>22)?22:((int)(num_sats(0)/1.6)),//BD_OFF?((num_sats(0)/1.6>22)?22:((int)(num_sats(0)/1.6))):num_sats(0),//
         height_elipsoid_mm,   // Ellipsoid height in mm
         hacc * 1000,          // one-sigma standard deviation in mm
         vacc * 1000,          // one-sigma standard deviation in mm
@@ -2360,26 +2362,45 @@ void AP_GPS::Write_GPS(uint8_t i)
 
     float yaw_deg=0, yaw_accuracy_deg=0;
     uint32_t yaw_time_ms;
-    gps_yaw_deg(i, yaw_deg, yaw_accuracy_deg, yaw_time_ms);
+
+ //   gps_yaw_deg(i, yaw_deg, yaw_accuracy_deg, yaw_time_ms); //这里调用不起作用
+
+    yaw_deg = state[i].gps_yaw;
+
+    // get lagged timestamp 获取滞后时间戳
+    yaw_time_ms = state[i].gps_yaw_time_ms;
+    float lag_s;
+    if (get_lag(i, lag_s)) {
+        uint32_t lag_ms = lag_s * 1000;
+        yaw_time_ms -= lag_ms;
+    }
+
+    if (state[i].have_gps_yaw_accuracy) {
+        yaw_accuracy_deg = state[i].gps_yaw_accuracy;
+    } else {
+        // fall back to 10 degrees as a generic default 回落到10度作为通用默认值
+        yaw_accuracy_deg = 10;
+    }
 
     const struct log_GPS pkt {
         LOG_PACKET_HEADER_INIT(LOG_GPS_MSG),
         time_us       : time_us,
         instance      : i,
-        status        : (uint8_t)status(i),
-        gps_week_ms   : time_week_ms(i),
-        gps_week      : time_week(i),
-        num_sats      : num_sats(i),
-        hdop          : get_hdop(i),
+        status        : (uint8_t)status(i),  //查询GPS状态
+        gps_week_ms   : hal.util->deep_log,  //time_week_ms(i), //GPS周时间（毫秒）
+        gps_week      : hal.util->deep_mav_H, //time_week(i), // GPS星期
+        num_sats      : num_sats(i), //锁定的卫星数量
+        hdop          : get_hdop(i), //水平精度
         latitude      : loc.lat,
         longitude     : loc.lng,
         altitude      : loc.alt,
-        ground_speed  : ground_speed(i),
-        ground_course : ground_course(i),
-        //vel_z         : velocity(i).z,
-        vel_z         : hal.util->deep_log,
-        yaw           : hal.util->deep_mav_H,//yaw_deg,
-        used          : (uint8_t)(AP::gps().primary_sensor() == i)
+        ground_speed  : ground_speed(i), //地面速度（m/s）
+        ground_course : ground_course(i), //地面坡度（度）
+        vel_z         : velocity(i).z, //3D速度
+        yaw           : yaw_deg,
+        used          : (uint8_t)(AP::gps().primary_sensor() == i),
+//        deepL         :hal.util->deep_log,
+//        deepH         :hal.util->deep_mav_H,//,
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 
@@ -2411,7 +2432,7 @@ void AP_GPS::Write_GPS(uint8_t i)
 #endif
 
 /*
-  get GPS based yaw
+  get GPS based yaw 获取基于GPS的偏航
  */
 bool AP_GPS::gps_yaw_deg(uint8_t instance, float &yaw_deg, float &accuracy_deg, uint32_t &time_ms) const
 {
@@ -2427,8 +2448,9 @@ bool AP_GPS::gps_yaw_deg(uint8_t instance, float &yaw_deg, float &accuracy_deg, 
         return false;
     }
     yaw_deg = state[instance].gps_yaw;
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "22%d, %f",instance,yaw_deg);
 
-    // get lagged timestamp
+    // get lagged timestamp 获取滞后时间戳
     time_ms = state[instance].gps_yaw_time_ms;
     float lag_s;
     if (get_lag(instance, lag_s)) {
@@ -2439,7 +2461,7 @@ bool AP_GPS::gps_yaw_deg(uint8_t instance, float &yaw_deg, float &accuracy_deg, 
     if (state[instance].have_gps_yaw_accuracy) {
         accuracy_deg = state[instance].gps_yaw_accuracy;
     } else {
-        // fall back to 10 degrees as a generic default
+        // fall back to 10 degrees as a generic default 回落到10度作为通用默认值
         accuracy_deg = 10;
     }
     return true;

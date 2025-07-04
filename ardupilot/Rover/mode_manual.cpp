@@ -26,6 +26,7 @@ int ch1_pwm=1500,ch2_pwm=1500;
 char Manual_2=0,Manual_3=0;
 int ch3_pwm_max=0;
 extern float manual_speed;
+char calibration_flag=0;
 void ModeManual::update()
 {
     float desired_steering, desired_throttle, desired_lateral;
@@ -75,6 +76,7 @@ void ModeManual::update()
         //手动按照定速直线航行，仅控制作用，拨动油门摇杆刹车时退出定速
         if(ch10_pwm>=1890)//最高值时触发
         {
+            hal.util->tip=5; //提示定速巡航模式
 //
 //            int32_t ms_now = AP_HAL::millis();//获取现在的时间
 //            static int32_t ms_old1=0;
@@ -116,6 +118,10 @@ void ModeManual::update()
 
     if(ch6_pwm>=1800)
     {
+        if(calibration_flag==0)
+        {   calibration_flag=1;
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "Currently in straight line calibration mode!!!");//提示当前为直线校准模式
+        }
         //普通手动模式
         if(desired_throttle>0)
         {
@@ -138,7 +144,7 @@ void ModeManual::update()
                     float st=0-yaw_change/10000.0;
                     st = PID_realize(&pid, st);
  //                   gcs().send_text(MAV_SEVERITY_CRITICAL, " 22 yaw_change=%d,st=%f",yaw_change,st);
-                    calc_steering_from_turn_rate(st);
+                    calc_steering_from_turn_rate(st);//调整转向
 
                 }
             else yaw_old=AP::ahrs().yaw_sensor;
@@ -151,13 +157,24 @@ void ModeManual::update()
             yaw_old=AP::ahrs().yaw_sensor;
         }
     }
-    else yaw_old=AP::ahrs().yaw_sensor;
+    else
+        {
+            yaw_old=AP::ahrs().yaw_sensor;
+            if(calibration_flag==1)
+            {
+                calibration_flag=0;
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "Exit the straight line calibration mode!!!");//提示退出直线校准模式
+            }
+
+        }
+
 
 
 
     //左右对应左推进器，右油门对应右推进器
     if(ch10_pwm>1450&&ch10_pwm<1600)//中值触发
     {
+        hal.util->tip=6; //提示双杆模式
         float b=(ch11_pwm-1050)/900.0;
         int s1=RC_Channels::rc_channel(CH_3)->get_radio_in();//读取左油门
         int s2=3000-RC_Channels::rc_channel(CH_2)->get_radio_in();//读取右油门
@@ -173,6 +190,11 @@ void ModeManual::update()
 
 
     }
-//    else  Manual_2=0;
+    else  Manual_2=0;
+
+//    if(ch6_pwm<1400)
+//    {
+//        g2.motors.set_throttle(-100); //满负油门输出
+//    }
 
 }

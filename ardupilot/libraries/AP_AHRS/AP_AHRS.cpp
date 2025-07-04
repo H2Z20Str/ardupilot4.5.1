@@ -443,7 +443,8 @@ void AP_AHRS::update(bool skip_ins_update)
     update_AOA_SSA();
 
 #if HAL_GCS_ENABLED
-    state.active_EKF = _active_EKF_type();
+    state.active_EKF = _active_EKF_type(); //无HDT返回0 DCM,无gps也是0
+//    gcs().send_text(MAV_SEVERITY_CRITICAL,"EKF %d",(EKFType)state.active_EKF);
     if (state.active_EKF != last_active_ekf_type) {
         last_active_ekf_type = state.active_EKF;
         const char *shortname = "???";
@@ -465,7 +466,7 @@ void AP_AHRS::update(bool skip_ins_update)
 #endif
 #if HAL_NAVEKF3_AVAILABLE
         case EKFType::THREE:
-            shortname = "EKF3";
+            shortname = "EKF3";//正常HDT，内置也是
             break;
 #endif
 #if HAL_NAVEKF2_AVAILABLE
@@ -651,7 +652,8 @@ void AP_AHRS::update_EKF3(void)
             EKF3.getEulerAngles(eulers);
             roll  = eulers.x;
             pitch = eulers.y;
-            yaw   = eulers.z;
+            yaw   = eulers.z;//hzz
+//            gcs().send_text(MAV_SEVERITY_CRITICAL,"22 %f",yaw);
 
             update_cd_values();
             update_trig();
@@ -1874,6 +1876,8 @@ AP_AHRS::EKFType AP_AHRS::ekf_type(void) const
 #endif
 }
 
+//extern char hdt_ber;
+
 AP_AHRS::EKFType AP_AHRS::_active_EKF_type(void) const
 {
     EKFType ret = fallback_active_EKF_type();
@@ -1970,13 +1974,19 @@ AP_AHRS::EKFType AP_AHRS::_active_EKF_type(void) const
         }
 
         // Handle fallback for the case where the DCM or EKF is unable to provide attitude or height data.
+        //在DCM或EKF无法提供姿态或高度数据的情况下处理回退。
         const bool can_use_dcm = dcm.yaw_source_available() || fly_forward;
-        const bool can_use_ekf = filt_state.flags.attitude && filt_state.flags.vert_vel && filt_state.flags.vert_pos;
+        const bool can_use_ekf = filt_state.flags.attitude && filt_state.flags.vert_vel && filt_state.flags.vert_pos; //全都是0
+ //       gcs().send_text(MAV_SEVERITY_CRITICAL, "%d,%d,%d",filt_state.flags.attitude,filt_state.flags.vert_vel,filt_state.flags.vert_pos);//外置无HDT，
+
         if (!can_use_dcm && can_use_ekf) {
-            // no choice - continue to use EKF
+            // no choice - continue to use EKF 别无选择-继续使用EKF
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "00000");
             return ret;
-        } else if (!can_use_ekf) {
-            // No choice - we have to use DCM
+        } else if (!can_use_ekf) { //大概在这里修改 hzz
+            // No choice - we have to use DCM 别无选择-我们必须使用DCM
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "11111");//外置无HDT，
+//            if(hdt_ber!=1) //没作用
             return EKFType::DCM;
         }
 
@@ -1984,10 +1994,11 @@ AP_AHRS::EKFType AP_AHRS::_active_EKF_type(void) const
             option_set(Options::DISABLE_DCM_FALLBACK_FW) : option_set(Options::DISABLE_DCM_FALLBACK_VTOL);
         if (disable_dcm_fallback) {
             // don't fallback
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "22222");
             return ret;
         }
         
-        // Handle loss of global position when we still have a GPS fix
+        // Handle loss of global position when we still have a GPS fix 当我们仍然有GPS定位时，处理全球位置的丢失
         if (hal.util->get_soft_armed() &&
             (_gps_use != GPSUse::Disable) &&
             should_use_gps &&
@@ -2001,18 +2012,22 @@ AP_AHRS::EKFType AP_AHRS::_active_EKF_type(void) const
                Note: This is a last resort fallback and makes the navigation highly vulnerable to GPS noise.
                Note: When operating in a VTOL flight mode that actively controls height such as QHOVER,
                the EKF gives better vertical velocity and position estimates and height control characteristics.
+               GPS锁。
             */
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "33333");
             return EKFType::DCM;
         }
 
-        // Handle complete loss of navigation
+        // Handle complete loss of navigation 处理完全失去导航
         if (hal.util->get_soft_armed() && filt_state.flags.const_pos_mode) {
             /*
                Provided the EKF has been configured to use GPS, ie should_use_gps is true, then the
                key difference to the case handled above is only the absence of a GPS fix which means
                that DCM will not be able to navigate either so we are primarily concerned with
                providing an attitude, vertical position and vertical velocity estimate.
+               没有定位锁定
             */
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "44444");
             return EKFType::DCM;
         }
 
@@ -2028,43 +2043,50 @@ AP_AHRS::EKFType AP_AHRS::_active_EKF_type(void) const
                   speed the EKF should get yaw alignment
                 */
                 if (filt_state.flags.gps_quality_good) {
+//                    gcs().send_text(MAV_SEVERITY_CRITICAL, "55555");
                     return ret;
                 }
             }
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "66666"); //内置无搜星
             return EKFType::DCM;
         }
     }
 #endif
-
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "77777"); //内置有搜星
     return ret;
 }
 
 AP_AHRS::EKFType AP_AHRS::fallback_active_EKF_type(void) const
 {
 #if AP_AHRS_DCM_ENABLED
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "aaaa"); //一直返回这个
     return EKFType::DCM;
 #endif
 
 #if HAL_NAVEKF3_AVAILABLE
     if (_ekf3_started) {
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "bbbb");
         return EKFType::THREE;
     }
 #endif
 
 #if HAL_NAVEKF2_AVAILABLE
     if (_ekf2_started) {
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "cccc");
         return EKFType::TWO;
     }
 #endif
 
 #if AP_AHRS_EXTERNAL_ENABLED
     if (external.healthy()) {
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "dddd");
         return EKFType::EXTERNAL;
     }
 #endif
 
-    // so nobody is ready yet.  Return something, even if it is not ready:
+    // so nobody is ready yet.  Return something, even if it is not ready: 所以还没有人准备好。返回一些东西，即使它还没有准备好：
 #if HAL_NAVEKF3_AVAILABLE
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "eeee");
     return EKFType::THREE;
 #elif HAL_NAVEKF2_AVAILABLE
     return EKFType::TWO;
@@ -2468,7 +2490,7 @@ bool AP_AHRS::getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const
     return false;
 }
 
-// Retrieves the NED delta velocity corrected
+// Retrieves the NED delta velocity corrected 检索校正后的NED增量速度
 void AP_AHRS::_getCorrectedDeltaVelocityNED(Vector3f& ret, float& dt) const
 {
     int8_t imu_idx = -1;
@@ -3175,7 +3197,7 @@ uint8_t AP_AHRS::get_active_airspeed_index() const
 #endif // AP_AIRSPEED_ENABLED
 }
 
-// get the index of the current primary IMU
+// get the index of the current primary IMU 获取当前主IMU的索引
 uint8_t AP_AHRS::_get_primary_IMU_index() const
 {
     int8_t imu = -1;
@@ -3192,7 +3214,7 @@ uint8_t AP_AHRS::_get_primary_IMU_index() const
 #endif
 #if HAL_NAVEKF3_AVAILABLE
     case EKFType::THREE:
-        // let EKF2 choose primary IMU
+        // let EKF2 choose primary IMU 让EKF2选择主IMU
         imu = EKF3.getPrimaryCoreIMUIndex();
         break;
 #endif
@@ -3247,7 +3269,7 @@ int8_t AP_AHRS::_get_primary_core_index() const
     return -1;
 }
 
-// get the index of the current primary accelerometer sensor
+// get the index of the current primary accelerometer sensor 获取当前主加速度计传感器的索引
 uint8_t AP_AHRS::_get_primary_accel_index(void) const
 {
     return _get_primary_IMU_index();
@@ -3292,7 +3314,7 @@ void AP_AHRS::check_lane_switch(void)
     }
 }
 
-// request EKF yaw reset to try and avoid the need for an EKF lane switch or failsafe
+// request EKF yaw reset to try and avoid the need for an EKF lane switch or failsafe 请求EKF偏航重置，以尽量避免需要EKF车道开关或故障保护
 void AP_AHRS::request_yaw_reset(void)
 {
     switch (active_EKF_type()) {
@@ -3324,7 +3346,7 @@ void AP_AHRS::request_yaw_reset(void)
     }
 }
 
-// set position, velocity and yaw sources to either 0=primary, 1=secondary, 2=tertiary
+// set position, velocity and yaw sources to either 0=primary, 1=secondary, 2=tertiary 将位置、速度和偏航源设置为0=主，1=次，2=三级
 void AP_AHRS::set_posvelyaw_source_set(uint8_t source_set_idx)
 {
 #if HAL_NAVEKF3_AVAILABLE

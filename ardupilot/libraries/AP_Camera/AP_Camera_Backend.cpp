@@ -49,8 +49,8 @@ void AP_Camera_Backend::update()
         }
         return;
     }
-
-    // implement trigger distance
+  //  gcs().send_text(MAV_SEVERITY_CRITICAL, "12333=%.2f",(float)_params.trigg_dist);
+    // implement trigger distance 实施触发距离
     if (!is_positive(_params.trigg_dist)) {
         last_location.lat = 0;
         last_location.lng = 0;
@@ -62,7 +62,7 @@ void AP_Camera_Backend::update()
         return;
     }
 
-    // check vehicle flight mode supports trigg dist
+    // check vehicle flight mode supports trigg dist 检查飞行器飞行模式是否支持trigg-dist
     if (!_frontend.vehicle_mode_ok_for_trigg_dist()) {
         return;
     }
@@ -88,11 +88,11 @@ void AP_Camera_Backend::update()
         return;
     }
 
-    // check vehicle has moved at least trigg_dist meters
+    // check vehicle has moved at least trigg_dist meters 检查车辆是否至少移动了行程表
     if (current_loc.get_distance(last_location) < _params.trigg_dist) {
         return;
     }
-
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "_params.trigg_dist=%.2f",(float)_params.trigg_dist);
     take_picture();
 }
 
@@ -121,14 +121,14 @@ uint8_t AP_Camera_Backend::get_gimbal_device_id() const
     return 0;
 }
 
-
-// take a picture.  returns true on success
+extern int cam_sum;
+// take a picture.  returns true on success 拍一张照片。成功时返回true hzz
 bool AP_Camera_Backend::take_picture()
 {
     // setup feedback pin interrupt or timer
     setup_feedback_callback();
 
-    // check minimum time interval since last picture taken
+    // check minimum time interval since last picture taken 检查自上次拍摄照片以来的最小时间间隔
     uint32_t now_ms = AP_HAL::millis();
     if (now_ms - last_picture_time_ms < (uint32_t)(_params.interval_min * 1000)) {
         trigger_pending = true;
@@ -137,14 +137,18 @@ bool AP_Camera_Backend::take_picture()
 
     trigger_pending = false;
 
-    // trigger actually taking picture and update image count
+    // trigger actually taking picture and update image count 触发实际拍照并更新图像计数
     if (trigger_pic()) {
         image_index++;
+        cam_sum++;
         last_picture_time_ms = now_ms;
         IGNORE_RETURN(AP::ahrs().get_location(last_location));
 #if HAL_LOGGING_ENABLED
         log_picture();
 #endif
+        if(hal.util->hzz_test[0]==7)
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "cam_sum=%d",cam_sum);
+        hal.serial(4)->printf("$MARK,%d\r\n",cam_sum);//串口输出数据
         return true;
     }
 
@@ -174,6 +178,7 @@ void AP_Camera_Backend::control(float session, float zoom_pos, float zoom_step, 
 }
 
 // send camera feedback message to GCS
+
 void AP_Camera_Backend::send_camera_feedback(mavlink_channel_t chan)
 {
     int32_t altitude = 0;
@@ -189,13 +194,14 @@ void AP_Camera_Backend::send_camera_feedback(mavlink_channel_t chan)
         // convert.
     }
 
-    // send camera feedback message
+    // send camera feedback message 发送摄像头反馈信息 HZZ
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "ix=%d",image_index);
     mavlink_msg_camera_feedback_send(
         chan,
         camera_feedback.timestamp_us,       // image timestamp
         0,                                  // target system id
         _instance,                          // camera id
-        image_index,                        // image index
+        cam_sum,//image_index,                        // image index
         camera_feedback.location.lat,       // latitude
         camera_feedback.location.lng,       // longitude
         altitude*1e-2f,                     // alt MSL
@@ -218,7 +224,7 @@ void AP_Camera_Backend::send_camera_information(mavlink_channel_t chan) const
     const uint32_t cap_flags = CAMERA_CAP_FLAGS_CAPTURE_IMAGE;
     const float NaN = nanf("0x4152");
 
-    // send CAMERA_INFORMATION message
+    // send CAMERA_INFORMATION message 发送摄像头信息消息
     mavlink_msg_camera_information_send(
         chan,
         AP_HAL::millis(),       // time_boot_ms
@@ -241,7 +247,6 @@ void AP_Camera_Backend::send_camera_information(mavlink_channel_t chan) const
 void AP_Camera_Backend::send_camera_settings(mavlink_channel_t chan) const
 {
     const float NaN = nanf("0x4152");
-
     // send CAMERA_SETTINGS message
     mavlink_msg_camera_settings_send(
         chan,

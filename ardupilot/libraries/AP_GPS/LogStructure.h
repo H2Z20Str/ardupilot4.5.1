@@ -37,8 +37,8 @@ struct PACKED log_GPS {
     uint64_t time_us;
     uint8_t  instance;
     uint8_t  status;
-    uint32_t gps_week_ms;
-    uint16_t gps_week;
+    float gps_week_ms;//    uint32_t gps_week_ms;
+    float gps_week;//    uint16_t gps_week;
     uint8_t  num_sats;
     uint16_t hdop;
     int32_t  latitude;
@@ -49,6 +49,8 @@ struct PACKED log_GPS {
     float    vel_z;
     float    yaw;
     uint8_t  used;
+//    float    deepL;
+//    float    deepH;
 };
 
 // @LoggerMessage: GPA
@@ -208,11 +210,29 @@ struct PACKED log_south_RTK {
     uint64_t time_us;
     char msg[64];
     char msg2[64];
-};
+//    float s1;
+//    float s2;
+//    float s3;
+//    float s4;
+//    float s5;
+//    float s6;
+//    float s7;
+//    float s8;
+//    float s9;
+//    float s10;
+//    float s11;
+//    float s12;
+//    float s13;
+//    float s14;
+//    float s15;
+//    float s16; //变量不可以超过15个，否则仿真会报错。
 
+
+};
+                                    //"QBBIHBcLLeffffB", "TimeUS,I,Status,GMS,GWk,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,VZ,Yaw,U"
 #define LOG_STRUCTURE_FROM_GPS \
     { LOG_GPS_MSG, sizeof(log_GPS), \
-      "GPS",  "QBBIHBcLLeffffB", "TimeUS,I,Status,GMS,GWk,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,SL,SH,U", "s#-s-S-DUmnhnh-", "F--C-0BGGB000--" , true }, \
+      "GPS",  "QBBffBcLLeffffB", "TimeUS,I,Status,SL,SH,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,VZ,Yaw,U", "s#-s-S-DUmnhnh-", "F--C-0BGGB000--" , true }, \
     { LOG_SOUT_RTK, sizeof(log_south_RTK),\
       "RTK",  "QZZ",     "TimeUS,Message,Message2", "s--", "F--" , true },\
     { LOG_GPA_MSG,  sizeof(log_GPA), \

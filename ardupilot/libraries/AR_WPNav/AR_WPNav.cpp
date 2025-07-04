@@ -166,12 +166,13 @@ void AR_WPNav::update(float dt)
 
     hal.util->auto_speed =_speed_max;//获取设定的速度
     
-    if(fabs(_speed_max-speed_old) > 1e-6)
+    if(fabs(_speed_max-speed_old) > 1e-6) //实时更新速度，
     {
         speed_old=_speed_max;
-        if(_speed_max<3)
-            _base_speed_max=_speed_max*1.25;
-        else  _base_speed_max=_speed_max;
+//        if(_speed_max<3)
+//            _base_speed_max=_speed_max*1.25; //放大设定速度
+//        else
+            _base_speed_max=_speed_max;
     }
 
     //获取距离
@@ -277,7 +278,7 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
     // shift this leg to previous leg
     _scurve_prev_leg = _scurve_this_leg;
 
-
+    hal.util->tip=0;//跳点后重置消息提示
     //正式
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "dt=%ld,dg=%ld",destination.lat,destination.lng);
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "nt=%ld,ng=%ld",next_destination.lat,next_destination.lng);

@@ -506,6 +506,10 @@ public:
        // AP_Int8 log_rtk; //rtk日志记录
         AP_Int8 log_south; //水深日志记录
 
+        AP_Int32 POS_SUM;
+
+ //       AP_Int8 BD_south; //beidou日志记录
+
 
 };
 

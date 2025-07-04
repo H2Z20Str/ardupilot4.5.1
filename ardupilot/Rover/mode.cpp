@@ -503,9 +503,11 @@ void Mode::calc_steering_from_lateral_acceleration(float lat_accel, bool reverse
 
 // calculate steering output to drive towards desired heading
 // rate_max is a maximum turn rate in deg/s.  set to zero to use default turn rate limits
+//计算转向输出，以朝向所需航向行驶
+//rate_max是以度/秒为单位的最大转弯率。设置为零将使用默认转弯率限制
 void Mode::calc_steering_to_heading(float desired_heading_cd, float rate_max_degs)
 {
-    // call heading controller
+    // call heading controller 呼叫航向控制器
     const float steering_out = attitude_control.get_steering_out_heading(radians(desired_heading_cd*0.01f),
                                                                          radians(rate_max_degs),
                                                                          g2.motors.limit.steer_left,

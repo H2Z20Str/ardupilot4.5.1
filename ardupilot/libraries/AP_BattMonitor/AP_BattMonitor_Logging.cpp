@@ -1,5 +1,5 @@
 #include <AP_Logger/AP_Logger_config.h>
-
+#include <GCS_MAVLink/GCS.h>
 #if HAL_LOGGING_ENABLED
 
 #include "AP_BattMonitor_Backend.h"
@@ -22,17 +22,19 @@ void AP_BattMonitor_Backend::Log_Write_BAT(const uint8_t instance, const uint64_
 
     uint8_t soh_pct = 0;
     IGNORE_RETURN(get_state_of_health_pct(soh_pct));
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "111111111");
+    temperature_cd =(int16_t)hal.util->battery_temp;//
 
     const struct log_BAT pkt{
         LOG_PACKET_HEADER_INIT(LOG_BAT_MSG),
         time_us             : time_us,
         instance            : instance,
-        voltage             : _state.voltage,
+        voltage             : hal.util->battery_voltage,//_state.voltage,  //电压
         voltage_resting     : _state.voltage_resting_estimate,
-        current_amps        : has_curr ? _state.current_amps : AP::logger().quiet_nanf(),
+        current_amps        : hal.util->battery_current,//has_curr ? _state.current_amps : AP::logger().quiet_nanf(), //电流_
         current_total       : has_curr ? _state.consumed_mah : AP::logger().quiet_nanf(),
-        consumed_wh         : has_curr ? _state.consumed_wh : AP::logger().quiet_nanf(),
-        temperature         : temperature_cd,
+        consumed_wh         : hal.util->battery_remaining*1.0,//has_curr ? _state.consumed_wh : AP::logger().quiet_nanf(), //电量
+        temperature         : temperature_cd, //温度
         resistance          : _state.resistance,
         rem_percent         : percent,
         health              : _state.healthy,

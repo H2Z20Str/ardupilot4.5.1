@@ -20,6 +20,7 @@
 
 #include "AP_AHRS_View.h"
 #include <stdio.h>
+#include <GCS_MAVLink/GCS.h>
 
 AP_AHRS_View::AP_AHRS_View(AP_AHRS &_ahrs, enum Rotation _rotation, float pitch_trim_deg) :
     rotation(_rotation),
@@ -76,7 +77,7 @@ void AP_AHRS_View::update()
     if (yaw_sensor < 0) {
         yaw_sensor += 36000;
     }
-
+//    gcs().send_text(MAV_SEVERITY_CRITICAL,"11 %ld",yaw_sensor);
     ahrs.calc_trig(rot_body_to_ned,
                    trig.cos_roll, trig.cos_pitch, trig.cos_yaw,
                    trig.sin_roll, trig.sin_pitch, trig.sin_yaw);

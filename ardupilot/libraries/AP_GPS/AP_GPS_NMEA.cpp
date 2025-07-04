@@ -88,6 +88,7 @@ bool AP_GPS_NMEA::read(void)
  */
 extern char instance_hzz;
 extern unsigned char rtk_log;
+char hdt_ber=0;
 bool AP_GPS_NMEA::_decode(char c)
 {
     _sentence_length++;
@@ -143,15 +144,19 @@ bool AP_GPS_NMEA::_decode(char c)
                 hal.serial(2)->printf("%s\r\n",buf_gps);//串口输出数据
               if(hal.util->hzz_test[0]==5)
                   gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\%s\r\n",buf_gps);
+
             }
             else if((strncmp(&buf_gps[3], "HDT",strlen("HDT")) == 0) && buf_gps_sum>=10)//
             {
+
+                if(strncmp(&buf_gps[3], "HDT,,T*1B",strlen("HDT,,T*1B")) == 0) hdt_ber=1; //$GPHDT,,T*1B
+                else hdt_ber=0;
                 if(hal.util->hzz_test[0]==6)
-                    gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\%s\r\n",buf_gps);
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\%s,ber=%d\r\n",buf_gps,hdt_ber);
             }
 
             buf_gps_sum=0;
-//            gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%sd\r\n",buf_gps);
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%s\r\n",buf_gps);
             memset(buf_gps,'\0',256);
           }
     }
@@ -215,12 +220,20 @@ bool AP_GPS_NMEA::_decode(char c)
     return false;
 }
 
+/**/
 int32_t AP_GPS_NMEA::_parse_decimal_100(const char *p)
 {
     char *endptr = nullptr;
-    long ret = 100 * strtol(p, &endptr, 10);
+    long ret = 100 * strtol(p, &endptr, 10);  //仅提取到小数点之前的数字
     int sign = ret < 0 ? -1 : 1;
 
+    if(ret==0) //优化当数值为-0.1的情况
+    {
+        if(atof(p)<-0.00001)
+            sign=-1;
+    }
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "ret1=%ld!",ret);
     if (ret >= (long)INT32_MAX) {
         return INT32_MAX;
     }
@@ -240,6 +253,7 @@ int32_t AP_GPS_NMEA::_parse_decimal_100(const char *p)
             }
         }
     }
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "ret2=%ld!",ret);
     return ret;
 }
 
@@ -364,6 +378,7 @@ bool AP_GPS_NMEA::_have_new_message()
 }
 
 char status_old=0;
+int32_t GPS1_alt=0;
 // Processes a just-completed term
 // Returns true if new sentence has just passed checksum test and is validated
 bool AP_GPS_NMEA::_term_complete()
@@ -413,26 +428,26 @@ bool AP_GPS_NMEA::_term_complete()
                 state.hdop          = _new_hdop;
                 switch(_new_quality_indicator) {
                 case 0: // Fix not available or invalid
-                    state.status = AP_GPS::NO_FIX;
+                    state.status = AP_GPS::NO_FIX;//0，1、无效解
                     status_old=0;
                     break;
-                case 1: // GPS SPS Mode, fix valid
-                    state.status = AP_GPS::GPS_OK_FIX_3D;
+                case 1: // GPS SPS Mode, fix valid //单点
+                    state.status = AP_GPS::GPS_OK_FIX_3D;//
                     status_old=0;
                     break;
                 case 2: // Differential GPS, SPS Mode, fix valid
-                    state.status = AP_GPS::GPS_OK_FIX_3D_DGPS;
+                    state.status = AP_GPS::GPS_OK_FIX_3D_DGPS;//差分
                     status_old=0;
                     break;
-                case 3: // GPS PPS Mode, fix valid
+                case 3: // GPS PPS Mode, fix valid //pps，单点
                     state.status = AP_GPS::GPS_OK_FIX_3D;
                     status_old=1;
                     break;
-                case 4: // Real Time Kinematic. System used in RTK mode with fixed integers
+                case 4: // Real Time Kinematic. System used in RTK mode with fixed integers //固定
                     state.status = AP_GPS::GPS_OK_FIX_3D_RTK_FIXED;
                     status_old=2;
                     break;
-                case 5: // Float RTK. Satellite system used in RTK mode, floating integers
+                case 5: // Float RTK. Satellite system used in RTK mode, floating integers //浮点
                     state.status = AP_GPS::GPS_OK_FIX_3D_RTK_FLOAT;
                     break;
                 case 6: // Estimated (dead reckoning) Mode
@@ -483,6 +498,7 @@ bool AP_GPS_NMEA::_term_complete()
                 // configured to provide yaw when it first sends a
                 // HDT sentence.
                 state.gps_yaw_configured = true;
+       //         gcs().send_text(MAV_SEVERITY_CRITICAL, "hdt=%.2f",state.gps_yaw);
                 break;
             case _GPS_SENTENCE_PHD:
                 if (_last_AGRICA_ms != 0) {
@@ -589,7 +605,7 @@ bool AP_GPS_NMEA::_term_complete()
                 state.relposheading_ts = now;
                 if (calculate_moving_base_yaw(bearing, dist, alt_diff)) {
                     state.have_gps_yaw_accuracy = true;
-                    state.gps_yaw_accuracy = uh.heading_sd;
+                    state.gps_yaw_accuracy = uh.heading_sd;      //没有输出
                     _last_yaw_ms = now;
                 }
                 state.gps_yaw_configured = true;
@@ -711,7 +727,12 @@ bool AP_GPS_NMEA::_term_complete()
                 _new_longitude = -_new_longitude;
             break;
         case _GPS_SENTENCE_GGA + 9: // Altitude (GPGGA)
-            _new_altitude = _parse_decimal_100(_term);
+            _new_altitude = _parse_decimal_100(_term); //这里将负值改成正值了！ hzz
+
+            GPS1_alt=_new_altitude;
+         //   gcs().send_text(MAV_SEVERITY_CRITICAL, "now=%s",_term);
+         //   _new_altitude=-88.88;
+        //    gcs().send_text(MAV_SEVERITY_CRITICAL, "now=%ld",_new_altitude);
             break;
 
         // course and speed

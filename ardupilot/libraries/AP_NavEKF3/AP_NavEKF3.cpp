@@ -1123,11 +1123,13 @@ bool NavEKF3::pre_arm_check(bool requires_position, char *failure_msg, uint8_t f
         return false;
     }
 
+    //hzz
     // check if using compass (i.e. EK3_SRCn_YAW) with deprecated MAG_CAL values (5 was EXTERNAL_YAW, 6 was EXTERNAL_YAW_FALLBACK)
     const int8_t magCalParamVal = _magCal.get();
     const AP_NavEKF_Source::SourceYaw yaw_source = sources.getYawSource();
+//    gcs().send_text(MAV_SEVERITY_CRITICAL,"22 %d",_magCal.get()); //没有输出
     if (((magCalParamVal == 5) || (magCalParamVal == 6)) && (yaw_source != AP_NavEKF_Source::SourceYaw::GPS)) {
-        // yaw source is configured to use compass but MAG_CAL valid is deprecated
+        // yaw source is configured to use compass but MAG_CAL valid is deprecated 偏航源配置为使用指南针，但MAG_CAL有效性已弃用
         AP::dal().snprintf(failure_msg, failure_msg_len, "EK3_MAG_CAL and EK3_SRC1_YAW inconsistent");
         return false;
     }
@@ -1739,8 +1741,8 @@ void NavEKF3::convert_parameters()
             break;
         }
     }
-
     // use EK3_MAG_CAL to set EK3_SRC1_YAW
+
     switch (_magCal.get()) {
     case 5:
         // EK3_MAG_CAL = 5 (External Yaw sensor).  We rely on effective_magCal to interpret old "5" values as "Never"

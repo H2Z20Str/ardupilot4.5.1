@@ -890,14 +890,14 @@ bool ModeAuto::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
         //检查我们是否在该航路点徘徊-发送给地面军事系统的信息不同
         if (loiter_duration > 0) {
             // send message including loiter time
-            gcs().send_text(MAV_SEVERITY_INFO, "22 Reached waypoint #%u. Loiter for %u seconds",
+            gcs().send_text(MAV_SEVERITY_INFO, "Reached waypoint #%u. Loiter for %u seconds",
                             (unsigned int)cmd.index,
                             (unsigned int)loiter_duration);
             // record the current time i.e. start timer
             loiter_start_time = millis();
         } else {
             // send simpler message to GCS
-            gcs().send_text(MAV_SEVERITY_INFO, "11 Reached waypoint #%u", (unsigned int)cmd.index);
+            gcs().send_text(MAV_SEVERITY_INFO, "Reached waypoint #%u", (unsigned int)cmd.index);
 
         }
         wp_sum=cmd.index+1;

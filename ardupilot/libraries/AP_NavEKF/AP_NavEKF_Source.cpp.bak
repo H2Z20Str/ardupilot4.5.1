@@ -225,7 +225,7 @@ bool AP_NavEKF_Source::haveVelZSource() const
 }
 
 // get yaw source
-//extern char hdt_ber;
+extern char hdt_ber;
 AP_NavEKF_Source::SourceYaw AP_NavEKF_Source::getYawSource() const
 {
 //    gcs().send_text(MAV_SEVERITY_CRITICAL,"22 %d,%d",(int)_source_set[active_source_set].yaw,hdt_ber); //没有输出
@@ -233,12 +233,11 @@ AP_NavEKF_Source::SourceYaw AP_NavEKF_Source::getYawSource() const
     if ((_source_set[active_source_set].yaw == SourceYaw::COMPASS) && (AP::dal().compass().get_num_enabled() == 0)) {
         return SourceYaw::NONE;
     }
-//    if(hdt_ber==1)
-//    {
-////         _source_set[active_source_set].yaw = SourceYaw::COMPASS; //hzz
+    if(hdt_ber==1)
+    {
+//         _source_set[active_source_set].yaw = SourceYaw::COMPASS; //hzz
 //        return SourceYaw::COMPASS;
-//        gcs().send_text(MAV_SEVERITY_CRITICAL,"1111111");
-//    }
+    }
 
     return _source_set[active_source_set].yaw;
 }

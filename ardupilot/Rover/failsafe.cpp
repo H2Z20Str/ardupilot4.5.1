@@ -42,7 +42,7 @@ void Rover::failsafe_check()
 }
 
 /*
-  called to set/unset a failsafe event.
+  called to set/unset a failsafe event. 调用以设置/取消设置故障保护事件。
  */
 void Rover::failsafe_trigger(uint8_t failsafe_type, const char* type_str, bool on)
 {

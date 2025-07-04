@@ -53,10 +53,10 @@ Location::Location(const Vector3f &ekf_offset_neu, AltFrame frame)
     }
 }
 #endif  // AP_AHRS_ENABLED
-
+//extern int32_t GPS1_alt;
 void Location::set_alt_cm(int32_t alt_cm, AltFrame frame)
 {
-    alt = alt_cm;
+    alt =alt_cm; //系统高程，1234567;// GPS1_alt;//
     relative_alt = false;
     terrain_alt = false;
     origin_alt = false;

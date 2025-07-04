@@ -10,10 +10,11 @@
 struct PACKED log_SPOS {
     LOG_PACKET_HEADER;
     uint64_t time_us;
-    int32_t  latitude;
-    int32_t  longitude;
-    int32_t  altitude;
+//    int32_t  latitude;
+//    int32_t  longitude;
+//    int32_t  altitude;
     float  deep_water;
+    float  deep_water_H;
     float  deep_water_1;
     float  deep_water_2;
     float  deep_water_3;
@@ -21,7 +22,7 @@ struct PACKED log_SPOS {
     float  deep_water_5;
     float  start;
 };
-int32_t GPS_now[3];
+//int32_t GPS_now[3];
 
 extern float deep_water_1,deep_water_2,deep_water_3,deep_water_4,deep_water_5,deep_start;
 void Rover::Log_Write_SPOS()
@@ -29,16 +30,17 @@ void Rover::Log_Write_SPOS()
     struct log_SPOS pkt = {
         LOG_PACKET_HEADER_INIT(LOG_SPOS_MSG),
         time_us             : AP_HAL::micros64(),
-        latitude            : GPS_now[1],//经度
-        longitude           : GPS_now[2],//纬度
-        altitude            : GPS_now[0],//高
-        deep_water         : hal.util->deep_log,
-        deep_water_1       : deep_water_1,
-        deep_water_2       : deep_water_2,
-        deep_water_3       : deep_water_3,
-        deep_water_4       : deep_water_4,
-        deep_water_5       : deep_water_5,
-        start              : deep_start,
+//        latitude            : GPS_now[1],//经度
+//        longitude           : GPS_now[2],//纬度
+//        altitude            : GPS_now[0],//高
+        deep_water         : hal.util->deep_log,//低频水深
+        deep_water_H       :hal.util->deep_mav_H,
+        deep_water_1       : deep_water_1, //滤波水深1
+        deep_water_2       : deep_water_2, //滤波水深2
+        deep_water_3       : deep_water_3, //滤波水深3
+        deep_water_4       : deep_water_4, //滤波水深4
+        deep_water_5       : deep_water_5, //滤波水深5
+        start              : deep_start,    //原始计算水深
     };
     logger.WriteBlock(&pkt, sizeof(pkt));
 }
@@ -367,8 +369,10 @@ const LogStructure Rover::log_structure[] = {
       "GUIP",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ", "s-mmmnnn", "F-000000" },
 
 
+//      { LOG_SPOS_MSG, sizeof(log_SPOS),
+//        "SPOS",  "QLLefffffff", "TimeUS,Lat1,Lng1,Alt1,deep,dp1,dp2,dp3,dp4,dp5,sta", "sDUm-------", "FGGB-------" },
       { LOG_SPOS_MSG, sizeof(log_SPOS),
-        "SPOS",  "QLLefffffff", "TimeUS,Lat1,Lng1,Alt1,deep,dp1,dp2,dp3,dp4,dp5,sta", "sDUm-------", "FGGB-------" },
+        "SPOS",  "Qffffffff", "TimeUS,dpL,dpH,dpv1,dpv2,dpv3,dpv4,dpv5,sta", "s--------", "F--------" },
       { LOG_SOUTH_MSG, sizeof(log_south),
         "SOUT",  "QZ",     "TimeUS,Message", "s-", "F-"},
 };

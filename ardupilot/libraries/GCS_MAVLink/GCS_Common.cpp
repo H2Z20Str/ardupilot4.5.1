@@ -242,7 +242,7 @@ int8_t GCS_MAVLINK::battery_remaining_pct(const uint8_t instance) const {
     uint8_t percentage;
     return AP::battery().capacity_remaining_pct(percentage, instance) ? MIN(percentage, INT8_MAX) : -1;
 }
-
+char old_tip=0,tip_sum=0;
 void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
 {
     // catch the battery backend not supporting the required number of cells
@@ -349,8 +349,10 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
     //电池数据
     temp=hal.util->battery_temp;
     cell_mvolts[0]=hal.util->battery_voltage*1000;
-    cell_mvolts[1]=hal.util->deep_mav_L*1000;
-    cell_mvolts[2]=hal.util->deep_mav_H*1000;
+    cell_mvolts[1]=hal.util->deep_mav_L*100;
+    cell_mvolts[2]=hal.util->deep_mav_H*100;
+
+
     cell_mvolts[3]=hal.util->tip;   //
 
 
@@ -365,6 +367,7 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
 //       cell_mvolts[3]=tys;   //
 //       if(tys++>=4)tys=0;
 //    }
+//    cell_mvolts[3]=hal.util->hzz_test[0];
     //测试版end
 
     cell_mvolts[4]=cell_mvolts[3]*1000;   //
@@ -374,6 +377,13 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
 
 //    hal.util->deep_mav_L=0;
 //    hal.util->deep_mav_H=0;
+
+    if(old_tip==2&&hal.util->tip==1)
+    {
+        cell_mvolts[3]=2;   //
+        old_tip=2;
+        hal.util->tip=2;
+    }
 
     mavlink_msg_battery_status_send(chan,
                                     instance, // id
@@ -390,6 +400,18 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
                                     cell_mvolts_ext, // Cell 11..14 voltages
                                     0, // battery mode
                                     battery.get_mavlink_fault_bitmask(instance));   // fault_bitmask
+
+    if(old_tip==hal.util->tip)
+    {
+        if(tip_sum++>5)
+        {
+            hal.util->tip=0;//重置消息提示
+            tip_sum=0;
+
+        }
+    }
+    else old_tip=hal.util->tip;
+
 
 
 }
@@ -918,14 +940,17 @@ void GCS_MAVLINK::handle_radio_status(const mavlink_message_t &msg, bool log_rad
     }
 #endif
 }
-
-void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg)
+// int msg_sum=0;
+void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg) ///解析航点的
 {
     mavlink_mission_item_int_t mission_item_int;
     bool send_mission_item_warning = false;
     if (msg.msgid == MAVLINK_MSG_ID_MISSION_ITEM) {
         mavlink_mission_item_t mission_item;
         mavlink_msg_mission_item_decode(&msg, &mission_item);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL,"%d %f,%f",msg_sum++,mavlink_msg_mission_item_get_x(&msg),mavlink_msg_mission_item_get_y(&msg));
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "x:%ld,y:%ld",(int32_t)(1.0e7f*mission_item.x),(int32_t)(1.0e7f*mission_item.y)); //这个跟地面站读取的一致
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "x:%f,y:%f",(mission_item.x),(mission_item.y));
         MAV_MISSION_RESULT ret = AP_Mission::convert_MISSION_ITEM_to_MISSION_ITEM_INT(mission_item, mission_item_int);
         if (ret != MAV_MISSION_ACCEPTED) {
             const MAV_MISSION_TYPE type = (MAV_MISSION_TYPE)mission_item_int.mission_type;
@@ -935,6 +960,8 @@ void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg)
         send_mission_item_warning = true;
     } else {
         mavlink_msg_mission_item_int_decode(&msg, &mission_item_int);
+  //      gcs().send_text(MAV_SEVERITY_CRITICAL,"ss%d %ld,%ld",msg_sum++,mavlink_msg_mission_item_int_get_x(&msg),mavlink_msg_mission_item_int_get_y(&msg));
+  //      gcs().send_text(MAV_SEVERITY_CRITICAL, "22 x:%d,y:%d",(int32_t)(mission_item_int.x),(int32_t)(mission_item_int.y));
     }
     const uint8_t current = mission_item_int.current;
     const MAV_MISSION_TYPE type = (MAV_MISSION_TYPE)mission_item_int.mission_type;
@@ -1808,6 +1835,8 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
 
 uint8_t c_old=0,water_flag=0,mr72_flag=0;
 uint8_t water_n=0,mr72_n=0;
+//uint8_t SOUTH_SNFLAG=0,SOUTH_sum=0,snsum=0;
+uint8_t south_sn[16]="SU20EC154100253";
 
 void
 GCS_MAVLINK::update_receive(uint32_t max_time_us)
@@ -1853,7 +1882,7 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
         }
 
         //水深数据+电池数据
-        if(c=='S'&& c_old=='@') //@SIC,,GET,DATA.DEEP,OK,水深数据*CRC\r\n
+        if((c=='S'&& c_old=='@')||(c=='P'&& c_old=='$')) //@SIC,,GET,DATA.DEEP,OK,水深数据*CRC\r\n
         {
             water_flag=1;//标志可以接收
            // hal.util->water_deep_n=1;
@@ -1871,6 +1900,28 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
                 water_flag=0;//结束接收
             }
         }
+//        //机身号信息 $PSIC,DEVICE,01,SU20EC154100262;15+15，@SIC,,SET,DEVICE.BEAT,OK,船体SN|船体开机时间计数（秒）\r\n
+//        if(c=='P'&& c_old=='$')
+//        {
+//            SOUTH_SNFLAG=1;
+//            SOUTH_sum=1;
+//        }
+//        if(SOUTH_SNFLAG==1)
+//        {
+//
+//            if(SOUTH_sum>15&&SOUTH_sum<=30)
+//            {
+//                south_sn[SOUTH_sum-16]=c;
+//            }
+//            if((c_old=='\r'&&c=='\n')||SOUTH_sum>=40)
+//            {
+//                hal.util->water_deep_n=water_n;
+//                SOUTH_SNFLAG=0;//结束接收
+//                gcs().send_text(MAV_SEVERITY_CRITICAL, "%s",south_sn);
+//            }
+//            SOUTH_sum++;
+//        }
+
         c_old=c; //上一个获取的字符
 
 
@@ -1905,7 +1956,8 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
         // Try to get a new message
         if (mavlink_frame_char_buffer(channel_buffer(), channel_status(), c, &msg, &status) == MAVLINK_FRAMING_OK) {
             hal.util->persistent_data.last_mavlink_msgid = msg.msgid;
-            packetReceived(status, msg);
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "%d",msg.msgid);
+            packetReceived(status, msg); //解析函数
             parsed_packet = true;
             gcs_alternative_active[chan] = false;
             alternative.last_mavlink_ms = now_ms;
@@ -2975,17 +3027,29 @@ MAV_STATE GCS_MAVLINK::system_status() const
  */
 void GCS_MAVLINK::send_heartbeat() const
 {
+    if(chan==3) //测试 0,1,2,3,4,不往Mavlink3发
+       {
+         //   gcs().send_text(MAV_SEVERITY_CRITICAL,"不输出：%d",chan);
+            return;
+       }
+    mavlink_msg_south_sn_send(chan,south_sn);
     mavlink_msg_heartbeat_send(
         chan,
         gcs().frame_type(),
         MAV_AUTOPILOT_ARDUPILOTMEGA,
         base_mode(),
-        gcs().custom_mode(),
+        gcs().custom_mode(),//飞控模式
         system_status());
+
+    //发送机身号 id:801
+//    gcs().send_text(MAV_SEVERITY_CRITICAL,"输出：%d",chan);
+
 }
 
 MAV_RESULT GCS_MAVLINK::handle_command_do_aux_function(const mavlink_command_int_t &packet)
 {
+
+
     if (packet.param2 > 2) {
         return MAV_RESULT_DENIED;
     }
@@ -3536,6 +3600,11 @@ void GCS_MAVLINK::handle_timesync(const mavlink_message_t &msg)
     rsync.ts1 = tsync.ts1;
 
     // respond with a timesync message
+//    if(chan==hal.util->hzz_test[0]) //测试 0,1,2,3,4
+//      {
+//       //   gcs().send_text(MAV_SEVERITY_CRITICAL,"不输出：%d",chan);
+//          return;
+//       }
     mavlink_msg_timesync_send(
         chan,
         rsync.tc1,
@@ -3549,6 +3618,11 @@ void GCS_MAVLINK::handle_timesync(const mavlink_message_t &msg)
 void GCS_MAVLINK::send_timesync()
 {
     _timesync_request.sent_ts1 = timesync_timestamp_ns();
+//    if(chan==hal.util->hzz_test[0]) //测试 0,1,2,3,4
+//      {
+//       //   gcs().send_text(MAV_SEVERITY_CRITICAL,"不输出：%d",chan);
+//          return;
+//       }
     mavlink_msg_timesync_send(
         chan,
         0,

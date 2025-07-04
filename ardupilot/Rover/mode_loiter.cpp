@@ -22,10 +22,12 @@ void ModeLoiter::update()
 {
     // get distance (in meters) to destination 获取到目的地的距离（单位：米）
     _distance_to_destination = rover.current_loc.get_distance(_destination);
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "悬停点：%ld,%ld",_destination.lat,_destination.lng);
 
     const float loiter_radius = rover.g2.sailboat.tack_enabled() ? g2.sailboat.get_loiter_radius() : g2.loit_radius;
 
     // if within loiter radius slew desired speed towards zero and use existing desired heading 如果在巡航半径内，将所需速度转向零，并使用现有的所需航向
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "距离：%f,半径：%f",_distance_to_destination,loiter_radius);
     if (_distance_to_destination <= loiter_radius) {
         // sailboats should not stop unless motoring 帆船除非开着车，否则不应该停下来
         const float desired_speed_within_radius = rover.g2.sailboat.tack_enabled() ? 0.1f : 0.0f;
@@ -37,6 +39,7 @@ void ModeLoiter::update()
         }
     } else {
         // P controller with hard-coded gain to convert distance to desired speed P控制器，具有硬编码增益，可将距离转换为所需速度
+        //根据距离悬停点的距离计算所需要的速度（计算速度，航行速度）
         _desired_speed = MIN((_distance_to_destination - loiter_radius) * g2.loiter_speed_gain, g2.wp_nav.get_default_speed());
 
         // calculate bearing to destination 计算到达目的地的方位
@@ -68,10 +71,13 @@ void ModeLoiter::update()
             turn_rate = g2.wp_nav.get_pivot_rate();
         }
     }
-
+  //  gcs().send_text(MAV_SEVERITY_CRITICAL, "c：%f,r：%f,d：%f",_desired_yaw_cd,turn_rate,_desired_speed);
     // run steering and throttle controllers 运行转向和油门控制器
-    calc_steering_to_heading(_desired_yaw_cd, turn_rate);
-    calc_throttle(_desired_speed, true);
+
+    calc_steering_to_heading(_desired_yaw_cd, turn_rate); //转向
+    calc_throttle(_desired_speed, true); //油门
+//    calc_steering_to_heading(-675, turn_rate); //转向
+//    calc_throttle(2, true); //油门
 }
 
 // get desired location
