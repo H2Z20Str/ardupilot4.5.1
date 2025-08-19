@@ -243,6 +243,7 @@ int8_t GCS_MAVLINK::battery_remaining_pct(const uint8_t instance) const {
     return AP::battery().capacity_remaining_pct(percentage, instance) ? MIN(percentage, INT8_MAX) : -1;
 }
 char old_tip=0,tip_sum=0;
+extern float des_old,des_lv,des_now,yaw_oldl,yaw_nowl;
 void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
 {
     // catch the battery backend not supporting the required number of cells
@@ -370,7 +371,13 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
 //    cell_mvolts[3]=hal.util->hzz_test[0];
     //测试版end
 
-    cell_mvolts[4]=cell_mvolts[3]*1000;   //
+ //   cell_mvolts[4]=cell_mvolts[3]*1000;   //
+
+    cell_mvolts[4]=des_old*10000;
+    cell_mvolts[5]=des_lv*10000;
+    cell_mvolts[6]=des_now*10000;
+    cell_mvolts[7]=yaw_oldl*10;
+    cell_mvolts[8]=yaw_nowl*10;
 
     current=hal.util->battery_current*100;
     int8_t percentage = hal.util->battery_remaining;
@@ -559,11 +566,14 @@ void GCS_MAVLINK::send_proximity()
 //    ralar[0]=4.7;
 //    ralar[1]=3.6;
     // send horizontal distances
+
     if (proximity->get_status() == AP_Proximity::Status::Good) {
         Proximity_Distance_Array dist_array;
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "dist_array %d",proximity->get_horizontal_distances(dist_array));
         if (proximity->get_horizontal_distances(dist_array)) {
             for (uint8_t i = 0; i < PROXIMITY_MAX_DIRECTION; i++) {
                 if (!HAVE_PAYLOAD_SPACE(chan, DISTANCE_SENSOR)) {
+                    //gcs().send_text(MAV_SEVERITY_CRITICAL, "xxxxx");
                     return;
                 }
                 if (dist_array.valid(i)) {
@@ -573,7 +583,35 @@ void GCS_MAVLINK::send_proximity()
                     // need to send an invalid one.
                    // continue;
                 }
-              //  gcs().send_text(MAV_SEVERITY_CRITICAL, "id=%d",PROXIMITY_SENSOR_ID_START + i);
+
+                mavlink_msg_distance_sensor_send(
+                        chan,
+                        AP_HAL::millis(),                               // time since system boot
+                        dist_min,                                       // minimum distance the sensor can measure in centimeters
+                        dist_max,                                       // maximum distance the sensor can measure in centimeters
+                        (uint16_t)(hal.util->ralar[i]* 100.0f),//(uint16_t)(dist_array.distance[i] * 100.0f),    // current distance reading
+                        MAV_DISTANCE_SENSOR_LASER,                      // type from MAV_DISTANCE_SENSOR enum
+                        PROXIMITY_SENSOR_ID_START + i,                  // onboard ID of the sensor
+                        dist_array.orientation[i],                      // direction the sensor faces from MAV_SENSOR_ORIENTATION enum
+                        0,                                              // Measurement covariance in centimeters, 0 for unknown / invalid readings
+                        0, 0, nullptr, 0);
+
+            }
+        }
+        else if(hal.util->mr72_switch!=0)
+        {
+            for (uint8_t i = 0; i < PROXIMITY_MAX_DIRECTION; i++) {
+                if (!HAVE_PAYLOAD_SPACE(chan, DISTANCE_SENSOR)) {
+                    //gcs().send_text(MAV_SEVERITY_CRITICAL, "xxxxx");
+                    return;
+                }
+                if (dist_array.valid(i)) {
+                    proximity_ever_valid_bitmask |= (1U << i);
+                } else if (!(proximity_ever_valid_bitmask & (1U << i))) {
+                    // we've never sent this distance out, so we don't
+                    // need to send an invalid one.
+                   // continue;
+                }
                 mavlink_msg_distance_sensor_send(
                         chan,
                         AP_HAL::millis(),                               // time since system boot
@@ -590,7 +628,7 @@ void GCS_MAVLINK::send_proximity()
         }
 
     }
-
+    //memset(hal.util->ralar,0,10);
     // send upward distance
     float dist_up;
     if (proximity->get_upward_distance(dist_up)) {
@@ -941,6 +979,7 @@ void GCS_MAVLINK::handle_radio_status(const mavlink_message_t &msg, bool log_rad
 #endif
 }
 // int msg_sum=0;
+extern int32_t lat1,lng1;
 void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg) ///解析航点的
 {
     mavlink_mission_item_int_t mission_item_int;
@@ -951,6 +990,9 @@ void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg) ///解析航
 //    gcs().send_text(MAV_SEVERITY_CRITICAL,"%d %f,%f",msg_sum++,mavlink_msg_mission_item_get_x(&msg),mavlink_msg_mission_item_get_y(&msg));
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "x:%ld,y:%ld",(int32_t)(1.0e7f*mission_item.x),(int32_t)(1.0e7f*mission_item.y)); //这个跟地面站读取的一致
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "x:%f,y:%f",(mission_item.x),(mission_item.y));
+        lat1=(int32_t)(1.0e7f*mission_item.x);
+        lng1=(int32_t)(1.0e7f*mission_item.y);
+
         MAV_MISSION_RESULT ret = AP_Mission::convert_MISSION_ITEM_to_MISSION_ITEM_INT(mission_item, mission_item_int);
         if (ret != MAV_MISSION_ACCEPTED) {
             const MAV_MISSION_TYPE type = (MAV_MISSION_TYPE)mission_item_int.mission_type;
@@ -960,6 +1002,8 @@ void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg) ///解析航
         send_mission_item_warning = true;
     } else {
         mavlink_msg_mission_item_int_decode(&msg, &mission_item_int);
+        lat1=mavlink_msg_mission_item_int_get_x(&msg);
+        lng1=mavlink_msg_mission_item_int_get_y(&msg);
   //      gcs().send_text(MAV_SEVERITY_CRITICAL,"ss%d %ld,%ld",msg_sum++,mavlink_msg_mission_item_int_get_x(&msg),mavlink_msg_mission_item_int_get_y(&msg));
   //      gcs().send_text(MAV_SEVERITY_CRITICAL, "22 x:%d,y:%d",(int32_t)(mission_item_int.x),(int32_t)(mission_item_int.y));
     }

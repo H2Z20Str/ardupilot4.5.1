@@ -14,6 +14,7 @@
  */
 
 #include "AP_Proximity_Boundary_3D.h"
+#include <GCS_MAVLink/GCS.h>
 
 #define PROXIMITY_BOUNDARY_3D_TIMEOUT_MS 750 // we should check the 3D boundary faces after this many ms
 
@@ -424,12 +425,14 @@ bool AP_Proximity_Boundary_3D::get_layer_distances(uint8_t layer_number, float d
         prx_dist_array.orientation[i] = i;
         const AP_Proximity_Boundary_3D::Face face(layer_number, i);
         if (!face.valid()) {
+           // gcs().send_text(MAV_SEVERITY_CRITICAL, "aaaa");
             return false;
         }
         if (get_distance(face, prx_dist_array.distance[i]) && get_filtered_distance(face, prx_filt_dist_array.distance[i])) {
             valid_distances = true;
             prx_dist_array.offset_valid |= (1U << i);
             prx_filt_dist_array.offset_valid |= (1U << i);
+            //gcs().send_text(MAV_SEVERITY_CRITICAL, "bbbb");
         } else {
             prx_dist_array.distance[i] = dist_max;
             prx_filt_dist_array.distance[i] = dist_max;

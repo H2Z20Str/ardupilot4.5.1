@@ -110,6 +110,10 @@ public:
 
     // parameter var table
     static const struct AP_Param::GroupInfo var_info[];
+    void south_restore(const Location destination,const Location origin);//用于回到线上的操作
+    void south_jump(const Location destination,const Location origin);//用于判断是否继续跳点
+    Location jump_begin; //第一次跳点避障前的目标点
+    int jump_flag=0;   //连续跳点标志
 
 protected:
 

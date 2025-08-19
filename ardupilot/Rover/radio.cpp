@@ -129,7 +129,7 @@ extern int ch1_pwm,ch2_pwm;
 extern char Manual_2,Manual_3;
 extern int ch3_pwm_max;
 char Manual_3_v=0;
-
+extern unsigned char boat_model;
 void Rover::read_radio()
 {
     if (!rc().read_input()) {
@@ -153,28 +153,54 @@ void Rover::read_radio()
            hal.util->ch5_pwm=RC_Channels::rc_channel(CH_5)->get_radio_in(); //读取速度档位     
             {
              //   yaw_old=AP::ahrs().yaw_sensor;
-                if(hal.util->ch5_pwm<1200)
+                if(hal.util->ch5_pwm<1200) //低速
                 {
+                  if(boat_model==20)//20船
+                  {
                     if(g3.velocity_min_1>1500)
                         hal.util->pwm_out1=(int16_t)g3.velocity_min_1;
                     else hal.util->pwm_out1=1650;
                     if(g3.velocity_min_2>1500)
                         hal.util->pwm_out2=(int16_t)g3.velocity_min_2;
                     else hal.util->pwm_out2=1650;
+                   }
+                  else //30船
+                  {
+                      if(g3.velocity30_min_1>1500)
+                          hal.util->pwm_out1=(int16_t)g3.velocity30_min_1;
+                      else hal.util->pwm_out1=1640;
+                      if(g3.velocity30_min_2>1500)
+                          hal.util->pwm_out2=(int16_t)g3.velocity30_min_2;
+                      else hal.util->pwm_out2=1640;
+                  }
+
+
                     if(Manual_3==2)
                     {
                         if(ch3_pwm_max>g3.velocity_min_1)ch3_pwm_max=g3.velocity_min_1;
                     }
                     Manual_3_v=(Manual_3_v&0xf0)|(0x01<<0);
                 }
-                else if(hal.util->ch5_pwm<1600)
+                else if(hal.util->ch5_pwm<1600) //中速
                 {
+                  if(boat_model==20)//20船
+                  {
                     if(g3.velocity_trim_1>1500)
                         hal.util->pwm_out1=(int16_t)g3.velocity_trim_1;
                     else hal.util->pwm_out1=1750;
                     if(g3.velocity_trim_2>1500)
                         hal.util->pwm_out2=(int16_t)g3.velocity_trim_2;
                     else hal.util->pwm_out2=1750;
+                  }
+                  else
+                  {
+                      if(g3.velocity30_trim_1>1500)
+                          hal.util->pwm_out1=(int16_t)g3.velocity30_trim_1;
+                      else hal.util->pwm_out1=1680;
+                      if(g3.velocity30_trim_2>1500)
+                          hal.util->pwm_out2=(int16_t)g3.velocity30_trim_2;
+                      else hal.util->pwm_out2=1680;
+                  }
                     if(Manual_3==2)
                     {
                         if(ch3_pwm_max>g3.velocity_trim_1)ch3_pwm_max=g3.velocity_trim_1;
@@ -183,12 +209,24 @@ void Rover::read_radio()
                 }
                 else if(hal.util->ch5_pwm<2000)
                 {
+                  if(boat_model==20)//20船
+                  {
                     if(g3.velocity_max_1>1500)
                         hal.util->pwm_out1=(int16_t)g3.velocity_max_1;
                     else hal.util->pwm_out1=1800;
                     if(g3.velocity_max_2>1500)
                         hal.util->pwm_out2=(int16_t)g3.velocity_max_2;
                     else hal.util->pwm_out2=1800;
+                  }
+                  else
+                  {
+                      if(g3.velocity30_max_1>1500)
+                          hal.util->pwm_out1=(int16_t)g3.velocity30_max_1;
+                      else hal.util->pwm_out1=1800;
+                      if(g3.velocity30_max_2>1500)
+                          hal.util->pwm_out2=(int16_t)g3.velocity30_max_2;
+                      else hal.util->pwm_out2=1800;
+                  }
                     if(Manual_3==2)
                     {
                         if(ch3_pwm_max>g3.velocity_max_1)ch3_pwm_max=g3.velocity_max_1;
@@ -200,7 +238,7 @@ void Rover::read_radio()
                     hal.util->pwm_out1=ch1_pwm;
                     hal.util->pwm_out2=ch2_pwm;
                 }
-                if(Manual_3==1)
+                if(Manual_3==1) //定速巡航根据档位增减速度
                {
                     hal.util->pwm_out1=hal.util->pwm_out2=ch3_pwm_max;
 
@@ -235,6 +273,10 @@ void Rover::read_radio()
     else  //非手动时的pwm
         {
             //2m/s 1800 -1500=300  5m 2100-1500=600
+            if(hal.util->auto_speed<=1) hal.util->auto_speed+=1;
+
+          if(boat_model==20)//20船
+          {
             if((hal.util->auto_speed*g3.velocity_auto_1+1500)>2100)
                 hal.util->pwm_out1=2100;
             else hal.util->pwm_out1=hal.util->auto_speed*g3.velocity_auto_1 +1500 ;
@@ -242,6 +284,17 @@ void Rover::read_radio()
             if((hal.util->auto_speed*g3.velocity_auto_2+1500)>2100)
                hal.util->pwm_out2=2100;
             else hal.util->pwm_out2=hal.util->auto_speed*g3.velocity_auto_2+1500;
+          }
+          else
+          {
+              if((hal.util->auto_speed*g3.velocity30_auto_1+1500)>2100)
+                  hal.util->pwm_out1=2100;
+              else hal.util->pwm_out1=hal.util->auto_speed*g3.velocity30_auto_1 +1500 ;
+
+              if((hal.util->auto_speed*g3.velocity30_auto_2+1500)>2100)
+                 hal.util->pwm_out2=2100;
+              else hal.util->pwm_out2=hal.util->auto_speed*g3.velocity30_auto_2+1500;
+          }
         }
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "pwm1=%d，pwm2=%d",hal.util->pwm_out1,hal.util->pwm_out2);
 }

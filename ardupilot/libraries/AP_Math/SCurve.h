@@ -121,7 +121,7 @@ private:
     float time_end() const WARN_IF_UNUSED;
 
     // time left before sequence will complete
-    float get_time_remaining() const WARN_IF_UNUSED;
+    float get_time_remaining() ;//const WARN_IF_UNUSED
 
     // time when acceleration section of the sequence will complete
     float get_accel_finished_time() const WARN_IF_UNUSED;

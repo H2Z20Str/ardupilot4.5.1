@@ -25,6 +25,7 @@ enum LoggingParameters {
     LOG_GUIDEDTARGET_MSG,
     LOG_SPOS_MSG,
     LOG_SOUTH_MSG,
+    LOG_LOIT_MSG,
 };
 
 #define MASK_LOG_ATTITUDE_FAST  (1<<0)

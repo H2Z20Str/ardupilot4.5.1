@@ -27,6 +27,7 @@ bool ModeRTL::_enter()
     return true;
 }
 
+extern char batrtlflag;
 void ModeRTL::update()
 {
     // determine if we should keep navigating 确定我们是否应该继续航行
@@ -56,7 +57,8 @@ void ModeRTL::update()
                 stop_vehicle();
             }
         }
-
+        if(batrtlflag==1)
+            hal.util->tip=4;
         // update distance to destination 更新到目的地的距离
         _distance_to_destination = rover.current_loc.get_distance(g2.wp_nav.get_destination());
     }

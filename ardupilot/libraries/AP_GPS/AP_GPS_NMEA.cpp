@@ -121,7 +121,8 @@ bool AP_GPS_NMEA::_decode(char c)
                }
                 if(instance_hzz==1) //外置
                      hal.serial(2)->printf("%s\r\n",buf_gps);//串口输出数据
-              //  gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\nk%sd\r\n",buf_gps);
+                if(hal.util->hzz_test[0]==5)
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\n%sd\r\n",buf_gps);
             }
             else if((strncmp(&buf_gps[3], "GGA",strlen("GGA")) == 0) && buf_gps_sum>=65 && buf_gps_sum<=100)//83
             {

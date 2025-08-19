@@ -488,26 +488,35 @@ void CanardInterface::processRx() {
 
          int s=(int)(mzb.Objects_DistLat/hal.util->mzb_width);
 
-         switch(s)
+         switch(s) //根据设定的宽度分配8个方向的避障数据
          {
-             case 0:MZBDist[0]=mzb.Objects_DistLong;break;
+             case 0:MZBDist[0]=mzb.Objects_DistLong;break; //-0.6-0.6
              case 1:
-             case 2:MZBDist[1]=mzb.Objects_DistLong;break;
-             case 3:
-             case 4:MZBDist[2]=mzb.Objects_DistLong;break;
-             case 5:
-             case 6:MZBDist[3]=mzb.Objects_DistLong;break;
+             case 2:
+             case 3:MZBDist[1]=mzb.Objects_DistLong;break; //0.6--1.8
+             case 4:
+             case 5:MZBDist[2]=mzb.Objects_DistLong;break; //1.8--3.0
+             case 6:
+             case 7:MZBDist[3]=mzb.Objects_DistLong;break; //3.0-4.2
              case -1:
-             case -2:MZBDist[5]=mzb.Objects_DistLong;break;
-             case -3:
-             case -4:MZBDist[6]=mzb.Objects_DistLong;break;
-             case -5:
-             case -6:MZBDist[7]=mzb.Objects_DistLong;break;
+             case -2:
+             case -3:MZBDist[7]=mzb.Objects_DistLong;break;
+             case -4:
+             case -5:MZBDist[6]=mzb.Objects_DistLong;break;
+             case -6:
+             case -7:MZBDist[5]=mzb.Objects_DistLong;break;
+
              default:MZBDist[4]=mzb.Objects_DistLong;break;
          }
 
+         if(mzb.Objects_DistLat>hal.util->mzb_width)
+             MZBDist[1]=mzb.Objects_DistLong;
+         else if(mzb.Objects_DistLat<(0-hal.util->mzb_width))
+             MZBDist[7]=mzb.Objects_DistLong;
+         else MZBDist[0]=mzb.Objects_DistLong;
 
-         MZBDist[1]=(mzb.Objects_DistLat>hal.util->mzb_width)?mzb.Objects_DistLong:0;
+        // MZBDist[1]=(mzb.Objects_DistLat>hal.util->mzb_width)?mzb.Objects_DistLong:0;
+
           if(hal.util->hzz_test[0]==2)  //输出实验
           {
                gcs().send_text(MAV_SEVERITY_CRITICAL, "目标 ID:%d    ",mzb.Objects_ID);

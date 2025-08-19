@@ -4,6 +4,7 @@ Mode::Mode() :
     ahrs(rover.ahrs),
     g(rover.g),
     g2(rover.g2),
+    g3(rover.g3),
     channel_steer(rover.channel_steer),
     channel_throttle(rover.channel_throttle),
     channel_lateral(rover.channel_lateral),

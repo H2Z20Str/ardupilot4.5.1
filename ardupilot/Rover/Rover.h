@@ -344,6 +344,7 @@ private:
 
     // Log.cpp
     void Log_Write_SPOS();
+    void Log_Write_loit();
     void Log_Write_south(const char *message);
     void Log_Write_Attitude();
     void Log_Write_Depth();

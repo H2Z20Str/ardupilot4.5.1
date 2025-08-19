@@ -189,6 +189,10 @@ AP_OAPathPlanner::OAPathPlannerUsed AP_OAPathPlanner::map_bendytype_to_pathplann
 // returns true and updates result_origin, result_destination, result_next_destination with an intermediate path
 // result_dest_to_next_dest_clear is set to true if the path from result_destination to result_next_destination is clear (only supported by Dijkstras)
 // path_planner_used updated with which path planner produced the result
+//如果需要围绕障碍物进行路径规划，则提供替代目标位置
+//返回true，并使用中间路径更新result_origin、result_destination和result_next_destination
+//如果从result_destination到result_next_destination的路径是明确的（仅Dijkstras支持），则result_dest_to_next_dest_clear设置为true
+//path_planner_used已更新，其中路径规划器生成了结果
 AP_OAPathPlanner::OA_RetState AP_OAPathPlanner::mission_avoidance(const Location &current_loc,
                                          const Location &origin,
                                          const Location &destination,
@@ -213,33 +217,33 @@ AP_OAPathPlanner::OA_RetState AP_OAPathPlanner::mission_avoidance(const Location
 
     WITH_SEMAPHORE(_rsem);
 
-    // place new request for the thread to work on 为要处理的线程放置新的请求
-    avoidance_request.current_loc = current_loc;
-    avoidance_request.origin = origin;
-    avoidance_request.destination = destination;
-    avoidance_request.next_destination = next_destination;
-    avoidance_request.ground_speed_vec = AP::ahrs().groundspeed_vector();
-    avoidance_request.request_time_ms = now;
+    // place new request for the thread to work on 为要处理的线程放置新的请求,来自导航代码的回避请求
+    avoidance_request.current_loc = current_loc; //当前位置
+    avoidance_request.origin = origin;           //当前原点
+    avoidance_request.destination = destination; //当前目标点
+    avoidance_request.next_destination = next_destination; //下一个目标点
+    avoidance_request.ground_speed_vec = AP::ahrs().groundspeed_vector(); //地面速度矢量
+    avoidance_request.request_time_ms = now;//时间
 
     // check result's destination and next_destination matches our request
     // e.g. check this result was using our current inputs and not from an old request
     //检查结果的destination和nextdestination是否符合我们的请求
     //例如，检查这个结果是使用我们当前的输入，而不是来自旧的请求
-    const bool destination_matches = destination.same_latlon_as(avoidance_result.destination);
-    const bool next_destination_matches = next_destination.same_latlon_as(avoidance_result.next_destination);
+    const bool destination_matches = destination.same_latlon_as(avoidance_result.destination); //目的地匹配
+    const bool next_destination_matches = next_destination.same_latlon_as(avoidance_result.next_destination);//下一个目的地匹配
 
     // check results have not timed out 检查结果尚未超时
     const bool timed_out = (now - avoidance_result.result_time_ms > OA_TIMEOUT_MS) && (now - _activated_ms > OA_TIMEOUT_MS);
 
     // return results from background thread's latest checks 返回后台线程的最新检查结果
     if (destination_matches && next_destination_matches && !timed_out) {
-        // we have a result from the thread
-        result_origin = avoidance_result.origin_new;
-        result_destination = avoidance_result.destination_new;
-        result_next_destination = avoidance_result.next_destination_new;
-        result_dest_to_next_dest_clear = avoidance_result.dest_to_next_dest_clear;
-        path_planner_used = avoidance_result.path_planner_used;
-        return avoidance_result.ret_state;
+        // we have a result from the thread 我们有一个线程的结果，避障处理结果
+        result_origin = avoidance_result.origin_new; //避障原点
+        result_destination = avoidance_result.destination_new; //避障目标点
+        result_next_destination = avoidance_result.next_destination_new; //下一个避障目标点
+        result_dest_to_next_dest_clear = avoidance_result.dest_to_next_dest_clear; //结果dest到下一个dest清除
+        path_planner_used = avoidance_result.path_planner_used; //使用路径规划器
+        return avoidance_result.ret_state;//避障情况
     }
 
     // if timeout then path planner is taking too long to respond 如果超时，则路径规划器的响应时间过长
@@ -252,22 +256,23 @@ AP_OAPathPlanner::OA_RetState AP_OAPathPlanner::mission_avoidance(const Location
 }
 
 // avoidance thread that continually updates the avoidance_result structure based on avoidance_request
+//避免线程，根据avoidance_request不断更新avoidance-result结构
 void AP_OAPathPlanner::avoidance_thread()
 {
-    // require ekf origin to have been set
+    // require ekf origin to have been set 要求已设置ekf原点
     bool origin_set = false;
     while (!origin_set) {
         hal.scheduler->delay(500);
         Location ekf_origin {};
         {
-            WITH_SEMAPHORE(AP::ahrs().get_semaphore());
+            WITH_SEMAPHORE(AP::ahrs().get_semaphore()); //允许线程锁定以防止AHRS更新
             origin_set = AP::ahrs().get_origin(ekf_origin);    
         }
     }
 
     while (true) {
 
-        // if database queue needs attention, service it faster
+        // if database queue needs attention, service it faster 如果数据库队列需要关注，请更快地为其提供服务
         if (_oadatabase.process_queue()) {
             hal.scheduler->delay(1);
         } else {
@@ -275,14 +280,14 @@ void AP_OAPathPlanner::avoidance_thread()
         }
 
         const uint32_t now = AP_HAL::millis();
-        if (now - avoidance_latest_ms < OA_UPDATE_MS) {
-            continue;
+        if (now - avoidance_latest_ms < OA_UPDATE_MS) {//1hz，1秒内部处理
+            continue;//结束本次线程
         }
         avoidance_latest_ms = now;
 
         _oadatabase.update();
 
-        // values returned by path planners
+        // values returned by path planners 路径规划器返回的值
         Location origin_new;
         Location destination_new;
         Location next_destination_new;
@@ -290,20 +295,21 @@ void AP_OAPathPlanner::avoidance_thread()
         {
             WITH_SEMAPHORE(_rsem);
             if (now - avoidance_request.request_time_ms > OA_TIMEOUT_MS) {
-                // this is a very old request, don't process it
+                // this is a very old request, don't process it 这是一个非常旧的请求，不要处理它
                 continue;
             }
 
-            // copy request to avoid conflict with main thread
+            // copy request to avoid conflict with main thread 复制请求以避免与主线程冲突
             avoidance_request2 = avoidance_request;
 
             // store passed in origin, destination and next_destination so we can return it if object avoidance is not required
+            //复制请求以避免与主线程冲突
             origin_new = avoidance_request.origin;
             destination_new = avoidance_request.destination;
             next_destination_new = avoidance_request.next_destination;
         }
 
-        // run background task looking for best alternative destination
+        // run background task looking for best alternative destination 运行后台任务，寻找最佳替代目标
         OA_RetState res = OA_NOT_REQUIRED;
         OAPathPlannerUsed path_planner_used = OAPathPlannerUsed::None;
         switch (_type) {
@@ -356,22 +362,24 @@ void AP_OAPathPlanner::avoidance_thread()
             if ((_oabendyruler == nullptr) || _oadijkstra == nullptr) {
                 continue;
             } 
-            _oabendyruler->set_config(_margin_max);
+            _oabendyruler->set_config(_margin_max); //避障距离
             AP_OABendyRuler::OABendyType bendy_type;
             if (_oabendyruler->update(avoidance_request2.current_loc, avoidance_request2.destination, avoidance_request2.ground_speed_vec, origin_new, destination_new, bendy_type, proximity_only)) {
                 // detected a obstacle by vehicle's proximity sensor. Switch avoidance to BendyRuler till obstacle is out of the way
+                //通过车辆的接近传感器检测到障碍物。将避让切换到BendyRuler，直到障碍物让路
                 proximity_only = false;
                 res = OA_SUCCESS;
                 path_planner_used = map_bendytype_to_pathplannerused(bendy_type);
                 break;
             } else {
                 // cleared all obstacles, trigger Dijkstra's to calculate path based on current deviated position  
+                //清除所有障碍物，触发Dijkstra根据当前偏差位置计算路径
 #if AP_FENCE_ENABLED
                 if (proximity_only == false) {
                     _oadijkstra->recalculate_path();
                 }
 #endif
-                // only use proximity avoidance now for BendyRuler
+                // only use proximity avoidance now for BendyRuler 现在仅对BendyRuler使用邻近回避
                 proximity_only = true;
             }
 #if AP_FENCE_ENABLED
@@ -397,25 +405,27 @@ void AP_OAPathPlanner::avoidance_thread()
             path_planner_used = OAPathPlannerUsed::Dijkstras;
 #endif
             break;
-        }
+        } //case OA_PATHPLAN_DJIKSTRA_BENDYRULER:
 
         } // switch
 
         {
-            // give the main thread the avoidance result
+            // give the main thread the avoidance result 给出主线的回避结果
             WITH_SEMAPHORE(_rsem);
 
             // place the destination and next destination used into the result (used by the caller to verify the result matches their request)
+            //将目的地和下一个目的地放入结果中（由调用者用于验证结果是否与他们的请求匹配）
             avoidance_result.destination = avoidance_request2.destination;
             avoidance_result.next_destination = avoidance_request2.next_destination;
             avoidance_result.dest_to_next_dest_clear = dest_to_next_dest_clear;
 
-            // fill the result structure with the intermediate path
+            // fill the result structure with the intermediate path 用中间路径填充结果结构
             avoidance_result.origin_new = (res == OA_SUCCESS) ? origin_new : avoidance_result.origin_new;
             avoidance_result.destination_new = (res == OA_SUCCESS) ? destination_new : avoidance_result.destination;
             avoidance_result.next_destination_new = (res == OA_SUCCESS) ? next_destination_new : avoidance_result.next_destination;
 
             // create new avoidance result.dest_to_next_dest_clear field.  fill in with results from dijkstras or leave as unknown
+            //创建新的回避结果.dest_to_next_dest-clear字段。填写dijkstras的结果或留下未知
             avoidance_result.result_time_ms = AP_HAL::millis();
             avoidance_result.path_planner_used = path_planner_used;
             avoidance_result.ret_state = res;

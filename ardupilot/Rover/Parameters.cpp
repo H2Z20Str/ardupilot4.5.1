@@ -712,8 +712,8 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("VEL_Ki", 59, ParametersG2, velocity_Ki, 0.2),
     AP_GROUPINFO("VEL_Kd", 60, ParametersG2, velocity_Kd, 0.0),
 
-    AP_GROUPINFO("VEL_MV1", 61, ParametersG2, velocity_MV1, 188),
-    AP_GROUPINFO("VEL_MV2", 62, ParametersG2, velocity_MV2, 148),
+    AP_GROUPINFO("VEL_MV1", 61, ParametersG2, velocity_MV1, 188), //定速直线校准比例
+    AP_GROUPINFO("VEL_MV2", 62, ParametersG2, velocity_MV2, 148), //定速非直线校准比例
 
     AP_GROUPEND
 };
@@ -725,8 +725,8 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
      AP_GROUPINFO("OA_DEEP_EN", 1, ParametersG3, OA_deep_en, 0),//浅水开关，1为开，0为关
      AP_GROUPINFO("OA_DEEP_M", 2, ParametersG3, OA_deep_m, 0.6),//避障值，单位m，低于该值触发浅水避障
      AP_GROUPINFO("OA_DEEP_sum", 3, ParametersG3, OA_deep_sum, 25),//报警次数
-     AP_GROUPINFO("OA_DEEP_TIME", 4, ParametersG3, OA_deep_time, 3000),//清零时间
-     AP_GROUPINFO("OA_DEEP_SLEEP", 5, ParametersG3, OA_deeps, 30),//浅水报警间隔
+     AP_GROUPINFO("OA_DEEP_TIME", 4, ParametersG3, OA_deep_time, 3000),//清零时间ms
+     AP_GROUPINFO("OA_DEEP_SLEEP", 5, ParametersG3, OA_deeps, 3000),//浅水报警间隔ms
 
 
      AP_GROUPINFO("OA_DEEP_V", 6, ParametersG3, OA_deep_v, 1.0),
@@ -748,7 +748,7 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
 
 
     AP_GROUPINFO("OA_Avoid_ms", 16, ParametersG3, OA_Avoid_ms, 8000),//避障间隔
-    AP_GROUPINFO("OA_Avoid_sum", 17, ParametersG3, OA_Avoid_sum, 350),//避障次数
+    AP_GROUPINFO("OA_Avoid_sum", 17, ParametersG3, OA_Avoid_sum, 8),//避障次数
     AP_GROUPINFO("OA_Avoid_EN", 18, ParametersG3, OA_Avoid_en, 0),//避障开关，1为开，0为关
 
     AP_GROUPINFO("HZZ_test", 19, ParametersG3, hzz_test, 0),
@@ -764,11 +764,37 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
   //  AP_GROUPINFO("LOG_RTK", 26, ParametersG3, log_rtk, 1),
 
     AP_GROUPINFO("POS_SUM", 26, ParametersG3, POS_SUM, 0),
-    //   AP_GROUPINFO("BD_OFF", 26, ParametersG3, BD_south, 1),
+    AP_GROUPINFO("VEL_Radius_T", 27, ParametersG3, times_radius, 10),
 
 
+    AP_GROUPINFO("LOIT_Kp", 28, ParametersG3, loiter_Kp, 1.0),
+    AP_GROUPINFO("LOIT_Ki", 29, ParametersG3, loiter_Ki, 0.2),
+    AP_GROUPINFO("LOIT_Kd", 30, ParametersG3, loiter_Kd, 0.0),
+    AP_GROUPINFO("LOIT_TURN", 31, ParametersG3, loiter_turn_rate, 2.0),
 
-       
+    AP_GROUPINFO("OA_Avoid_off_ms", 32, ParametersG3, OA_Avoid_off_ms, 15000),//避障关闭时间
+
+     AP_GROUPINFO("BD_OFF", 33, ParametersG3, BD_south, 0),
+
+
+     //30船速度控制
+     AP_GROUPINFO("VEL30_MAX_1", 34, ParametersG3, velocity30_max_1, 1980),//最大速度6m/s
+     AP_GROUPINFO("VEL30_TRIM_1", 35, ParametersG3, velocity30_trim_1, 1680),//中速4m/s
+     AP_GROUPINFO("VEL30_MIN_1", 36, ParametersG3, velocity30_min_1, 1640),//低速2m/s
+
+
+     AP_GROUPINFO("VEL30_AUTO_1", 37, ParametersG3, velocity30_auto_1, 125),//切换速度控制通道，0是SW1,1是AUX1
+
+     AP_GROUPINFO("VEL30_MAX_2", 38, ParametersG3, velocity30_max_2, 1980),//最大速度6m/s
+     AP_GROUPINFO("VEL30_TRIM_2", 39, ParametersG3, velocity30_trim_2, 1680),//中速4m/s
+     AP_GROUPINFO("VEL30_MIN_2", 40, ParametersG3, velocity30_min_2, 1640),//低速2m/s
+
+     AP_GROUPINFO("VEL30_AUTO_2", 41, ParametersG3, velocity30_auto_2, 125),//切换速度控制通道，0是SW1,1是AUX1
+
+     AP_GROUPINFO("OA_DEEP_K", 42, ParametersG3, OA_deep_k, 0.01),//浅水报警回归直线判断条件
+     AP_GROUPINFO("OA_TD", 43, ParametersG3, OA_TD, 6),//浅水报警回归直线判断条件
+     AP_GROUPINFO("OA_TD_m", 44, ParametersG3, OA_TD_m, 1.2),//浅水报警回归直线判断条件
+
 
 
     AP_GROUPEND

@@ -122,17 +122,17 @@ bool Sailboat::tack_enabled() const
         return false;
     }
 
-    // tacking disabled if motor is always on
+    // tacking disabled if motor is always on 如果电机始终处于开启状态，则无法进行跟踪
     if (motor_state == UseMotor::USE_MOTOR_ALWAYS) {
         return false;
     }
 
-    // disable tacking if motor is available and wind is below cutoff
-    if (motor_assist_low_wind()) {
+    // disable tacking if motor is available and wind is below cutoff 如果电机可用且风力低于临界值，则禁用定位
+    if (motor_assist_low_wind()) {//如果电机应该打开以在低风时提供帮助，则为真
         return false;
     }
 
-    // otherwise tacking is enabled
+    // otherwise tacking is enabled 否则启用定位
     return true;
 }
 
@@ -384,13 +384,15 @@ bool Sailboat::tacking() const
 
 // returns true if sailboat should take a indirect navigation route to go upwind
 // desired_heading should be in centi-degrees
+//如果帆船应该采取间接航行路线逆风行驶，则返回true
+//所需的头部应以厘米为单位
 bool Sailboat::use_indirect_route(float desired_heading_cd) const
 {
     if (!tack_enabled()) {
         return false;
     }
 
-    // use sailboat controller until tack is completed
+    // use sailboat controller until tack is completed 使用帆船控制器，直到完成定位
     if (currently_tacking) {
         return true;
     }

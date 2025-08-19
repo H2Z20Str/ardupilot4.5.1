@@ -36,7 +36,7 @@ void AP_Camera_Backend::update()
     check_feedback();
 
     // time based triggering
-    // if time and distance triggering both are enabled then we only do time based triggering
+    // if time and distance triggering both are enabled then we only do time based triggering //时间打标
     if (time_interval_settings.num_remaining != 0) {
         uint32_t delta_ms = AP_HAL::millis() - last_picture_time_ms;
         if (delta_ms > time_interval_settings.time_interval_ms) {
@@ -89,7 +89,7 @@ void AP_Camera_Backend::update()
     }
 
     // check vehicle has moved at least trigg_dist meters 检查车辆是否至少移动了行程表
-    if (current_loc.get_distance(last_location) < _params.trigg_dist) {
+    if (current_loc.get_distance(last_location) < _params.trigg_dist) {  //距离打标
         return;
     }
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "_params.trigg_dist=%.2f",(float)_params.trigg_dist);
@@ -125,6 +125,10 @@ extern int cam_sum;
 // take a picture.  returns true on success 拍一张照片。成功时返回true hzz
 bool AP_Camera_Backend::take_picture()
 {
+    Location current_loc; //当前位置
+    if (!AP::ahrs().get_location(current_loc)) {
+       // gcs().send_text(MAV_SEVERITY_CRITICAL, "无法获取当前位置");
+    }
     // setup feedback pin interrupt or timer
     setup_feedback_callback();
 
@@ -147,7 +151,7 @@ bool AP_Camera_Backend::take_picture()
         log_picture();
 #endif
         if(hal.util->hzz_test[0]==7)
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "cam_sum=%d",cam_sum);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "$MARK%d,%d,%d",cam_sum,(int)current_loc.lng,(int)current_loc.lat);
         hal.serial(4)->printf("$MARK,%d\r\n",cam_sum);//串口输出数据
         return true;
     }

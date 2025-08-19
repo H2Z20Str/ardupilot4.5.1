@@ -118,6 +118,9 @@ extern float south_radius;
 extern float vel_speed_radius;
 extern int wp_sum;
 extern char south_wp_radius;
+extern int32_t wp_time,wp_flag;
+int32_t wp_time_now=0;
+extern int wp_r_t;
 // update navigation
 void AR_PosControl::update(float dt)
 {
@@ -257,15 +260,29 @@ void AR_PosControl::update(float dt)
     {
        if(south_wp_radius==0)//最后一点不减速
        {
-        if(south_distance<=(south_radius+3.5*(hal.util->auto_speed)))//减速带
+        if(south_distance<=(south_radius+1.5*(hal.util->auto_speed)))//减速带hal.util->auto_speed
          {
-            _desired_speed=((hal.util->auto_speed)<vel_speed_radius?(hal.util->auto_speed):vel_speed_radius);
+            _desired_speed=((hal.util->auto_speed)<vel_speed_radius?(_desired_speed):vel_speed_radius);
          }
+        //驶出航点后10s内限制速度
+        if(wp_flag==1)
+        {
+            wp_time_now=AP_HAL::millis();//获取现在的时间
+            if(wp_time_now-wp_time<(wp_r_t*1000)) //10s内
+            {
+                _desired_speed=((hal.util->auto_speed)<vel_speed_radius?(_desired_speed):vel_speed_radius);
+            }
+            else
+                wp_flag=0;
+
+        }
+
+
        }
 //         else _desired_speed=(hal.util->auto_speed-0.4);
 
          if(hal.util->deep_sleep_flag==1) _desired_speed=((hal.util->auto_speed)<hal.util->DEEP_V?(hal.util->auto_speed):hal.util->DEEP_V);//浅水避障减速
-         if (hal.util->bizhang_sum!=0)_desired_speed=((hal.util->auto_speed)<1.2?(hal.util->auto_speed):1.2);//避障减速
+         if (hal.util->bizhang_sum!=0)_desired_speed=((hal.util->auto_speed)<hal.util->DEEP_V?(hal.util->auto_speed):hal.util->DEEP_V);//避障减速
 
     }
     // calculate turn rate from desired lateral acceleration

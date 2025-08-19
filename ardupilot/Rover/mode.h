@@ -199,6 +199,7 @@ protected:
     class AP_AHRS &ahrs;
     class Parameters &g;
     class ParametersG2 &g2;
+    class ParametersG3 &g3;
 
     class RC_Channel *&channel_steer;
     class RC_Channel *&channel_throttle;
@@ -634,6 +635,7 @@ public:
 
     // return distance (in meters) to destination
     float get_distance_to_destination() const override { return _distance_to_destination; }
+    float PID_realizeloit(PID *pid, float speed);//PID 控制 2025.05.30 hzz
 
 protected:
 
@@ -641,6 +643,7 @@ protected:
 
     Location _destination;      // target location to hold position around
     float _desired_speed;       // desired speed (ramped down from initial speed to zero)
+
 };
 
 class ModeManual : public Mode

@@ -27,6 +27,7 @@ char Manual_2=0,Manual_3=0;
 int ch3_pwm_max=0;
 extern float manual_speed;
 char calibration_flag=0;
+extern int pointc_flag;
 void ModeManual::update()
 {
     float desired_steering, desired_throttle, desired_lateral;
@@ -35,6 +36,8 @@ void ModeManual::update()
 
     // apply manual steering expo
     desired_steering = 4500.0 * input_expo(desired_steering / 4500, g2.manual_steering_expo);
+
+    if(pointc_flag!=0)pointc_flag=0; //重置垂直点设置
 
     // if vehicle is balance bot, calculate actual throttle required for balancing
     if (rover.is_balancebot()) {
@@ -146,6 +149,7 @@ void ModeManual::update()
  //                   gcs().send_text(MAV_SEVERITY_CRITICAL, " 22 yaw_change=%d,st=%f",yaw_change,st);
                     calc_steering_from_turn_rate(st);//调整转向
 
+
                 }
             else yaw_old=AP::ahrs().yaw_sensor;
         }
@@ -192,6 +196,12 @@ void ModeManual::update()
     }
     else  Manual_2=0;
 
+    if(hal.util->hzz_test[0]==9)
+        calc_steering_to_heading(g2.velocity_MV1*100.0, g2.velocity_MV2*1.0); //转向测试 悬停
+//    else if(hal.util->hzz_test[0]==9)
+//        calc_steering_from_turn_rate(g2.velocity_MV1/100);//调整转向 自动
+//    else if(hal.util->hzz_test[0]==7)
+//        g2.motors.set_steering(g2.velocity_MV1*100.0, 0);//转向 手动
 //    if(ch6_pwm<1400)
 //    {
 //        g2.motors.set_throttle(-100); //满负油门输出

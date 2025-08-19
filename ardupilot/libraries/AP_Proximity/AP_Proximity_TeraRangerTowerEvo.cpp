@@ -93,6 +93,10 @@ uint16_t mr72_average=UINT16_VALUE(0xFF,  0xFF);
 uint8_t mr72_s=0;
 extern int MZBDist[8];
 extern char Manual_3;
+extern bool _oa_bizhang_sum_flag;
+bool zhijietiaodian=false;
+int zjtd=6;
+float zjtdm=0;
 // check for replies from sensor, returns true if at least one message was processed
 bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
 {
@@ -158,6 +162,16 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
  */
     AP_OAPathPlanner *oa1 = AP_OAPathPlanner::get_singleton();
   //添加避障数据解析 2024.05.31 hzz
+    const int32_t ms_now = AP_HAL::millis();
+    int oa_sleep=0;
+    if(ms_now-hal.util->OA_off_time<hal.util->OA_off_ms) //跳点避障后10s内关闭避障
+    {
+        oa_sleep=1;
+        hal.util->mr72_switch=0; //关闭所有避障数据
+    }
+    else
+        if(hal.util->bizhang_sum!=0)hal.util->mr72_switch=3; //将全部数据用于避障
+
    if(hal.util->radar_type==0) //原始串口mr72雷达
    {
     if(hal.util->mr72_sum2>=20)
@@ -182,14 +196,39 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                      mr72_s=0;
                      mr72_average = UINT16_VALUE(0xFF,  0xFF);
                    }
-                if(mr72_s>=5) //
+                if(mr72_s>=1) //
                 {
                     mr72_average=mr72_average/(mr72_s+1);
                     mr72_s=0;
 
-                    hal.util->ralar[0]=(UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3]))/1000.0;
-                    hal.util->ralar[1]=(UINT16_VALUE(hal.util->mr72_buff2[4],  hal.util->mr72_buff2[5]))/1000.0;
-                    hal.util->ralar[7]=(UINT16_VALUE(hal.util->mr72_buff2[16],  hal.util->mr72_buff2[17]))/1000.0;
+//                    hal.util->ralar[0]=(UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3]))/1000.0;
+//                    hal.util->ralar[1]=(UINT16_VALUE(hal.util->mr72_buff2[4],  hal.util->mr72_buff2[5]))/1000.0;
+//                    hal.util->ralar[7]=(UINT16_VALUE(hal.util->mr72_buff2[16],  hal.util->mr72_buff2[17]))/1000.0;
+                    int bz_sflag=0;
+                    for(int i=0;i<8;i++)
+                    {
+                        hal.util->ralar[i]=UINT16_VALUE(hal.util->mr72_buff2[2+i*2],  hal.util->mr72_buff2[3+i*2])/1000.0;
+                        if( (hal.util->ralar[0]>0.1)&&hal.util->ralar[i]<(oa1->get_margin()+zjtdm))bz_sflag++;
+                    }
+
+                    if(bz_sflag>3&&oa_sleep==0)
+                      {
+                            gcs().send_text(MAV_SEVERITY_CRITICAL, "bz_sflag %d",bz_sflag); //
+                           zhijietiaodian=true; //四面楚歌直接跳点
+                      }
+
+                    if((hal.util->ralar[0]>0.1)&&(hal.util->ralar[0]< oa1->get_margin())&&(hal.util->mr72_switch!=0)) //正前避障数据小于避障距离，且在避障打开的情况
+                    {
+                        hal.util->mr72_switch=3; //将全部数据用于避障
+                        _oa_bizhang_sum_flag=true; //正前方有障碍物时才能避障计数
+                        if(Manual_3==1) //关闭定速巡航
+                        {
+                                Manual_3=0;
+                        }
+                    }
+
+
+
 
                 if(hal.util->mr72_switch==3) //原始
                 {
@@ -202,11 +241,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                 update_sector_data(270, UINT16_VALUE(hal.util->mr72_buff2[14], hal.util->mr72_buff2[15]));  // d7
                 update_sector_data(315, UINT16_VALUE(hal.util->mr72_buff2[16], hal.util->mr72_buff2[17]));  // d8
 
-                if(Manual_3==1)
-                {
-                    if((UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3])/1000.0)< oa1->get_margin())
-                        Manual_3=0;
-                }
+//                if(Manual_3==1)
+//                {
+//                    if((UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3])/1000.0)< oa1->get_margin())
+//                        Manual_3=0;
+//                }
                 }
                 else if(hal.util->mr72_switch==1)//只要正前方
                 {
@@ -219,11 +258,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                     update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
                     update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
 
-                    if(Manual_3==1)
-                    {
-                        if((UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3])/1000.0)< oa1->get_margin())
-                            Manual_3=0;
-                    }
+//                    if(Manual_3==1)
+//                    {
+//                        if((UINT16_VALUE(hal.util->mr72_buff2[2],  hal.util->mr72_buff2[3])/1000.0)< oa1->get_margin())
+//                            Manual_3=0;
+//                    }
                 }
                 else //所有都不要了
                 {
@@ -246,9 +285,25 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
    }
    else if(hal.util->radar_type==1) //can口 mr72雷达
    {
-       hal.util->ralar[0]=hal.util->MR72_can[0]/1000.0;
-       hal.util->ralar[1]=hal.util->MR72_can[1]/1000.0;
-       hal.util->ralar[7]=hal.util->MR72_can[7]/1000.0;
+//       hal.util->ralar[0]=hal.util->MR72_can[0]/1000.0;
+//       hal.util->ralar[1]=hal.util->MR72_can[1]/1000.0;
+//       hal.util->ralar[7]=hal.util->MR72_can[7]/1000.0;
+
+       for(int i=0;i<8;i++)
+       {
+           hal.util->ralar[i]=hal.util->MR72_can[i]/1000.0;;
+       }
+
+       if((hal.util->ralar[0]>0.1)&&(hal.util->ralar[0]< oa1->get_margin())&&(hal.util->mr72_switch!=0)) //正前避障数据小于避障距离，且在避障打开的情况
+       {
+           hal.util->mr72_switch=3; //将全部数据用于避障
+           _oa_bizhang_sum_flag=true; //正前方有障碍物时才能避障计数
+           if(Manual_3==1) //关闭定速巡航
+           {
+                   Manual_3=0;
+           }
+       }
+
                 if(hal.util->mr72_switch==3) //原始
                 {
                 update_sector_data(0,   hal.util->MR72_can[0]);   // d1
@@ -259,11 +314,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                 update_sector_data(225, hal.util->MR72_can[5]);  // d6
                 update_sector_data(270, hal.util->MR72_can[6]);  // d7
                 update_sector_data(315, hal.util->MR72_can[7]);  // d8
-                if(Manual_3==1)
-                {
-                    if(( hal.util->MR72_can[0]/1000.0)< oa1->get_margin())
-                        Manual_3=0;
-                }
+//                if(Manual_3==1)
+//                {
+//                    if(( hal.util->MR72_can[0]/1000.0)< oa1->get_margin())
+//                        Manual_3=0;
+//                }
                 }
                 else if(hal.util->mr72_switch==1)//只要正前方
                 {
@@ -275,11 +330,11 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                     update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
                     update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
                     update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
-                    if(Manual_3==1)
-                    {
-                        if((hal.util->MR72_can[0]/1000.0)< oa1->get_margin())
-                            Manual_3=0;
-                    }
+//                    if(Manual_3==1)
+//                    {
+//                        if((hal.util->MR72_can[0]/1000.0)< oa1->get_margin())
+//                            Manual_3=0;
+//                    }
                 }
                 else //所有都不要了
                 {
@@ -299,10 +354,35 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
    }
    else if(hal.util->radar_type==2) //can 莫之比雷达
    {
-       hal.util->ralar[0]=MZBDist[0];
-       hal.util->ralar[1]=MZBDist[1];
-       hal.util->ralar[7]=MZBDist[7];
-               if(hal.util->mr72_switch==3)//只要正前方
+//       hal.util->ralar[0]=MZBDist[0];
+//       hal.util->ralar[1]=MZBDist[1];
+//       hal.util->ralar[7]=MZBDist[7];
+       int bz_sflag=0;
+
+       for(int i=0;i<8;i++)
+       {
+           hal.util->ralar[i]=MZBDist[i];
+           if(MZBDist[i]>0.1&& MZBDist[i]<(oa1->get_margin()+zjtdm)) bz_sflag++;
+       }
+
+       if(bz_sflag>=zjtd&&oa_sleep==0) //跳点后不触发
+         {
+               gcs().send_text(MAV_SEVERITY_CRITICAL, "bz_sflag %d",bz_sflag); //
+              //if(hal.util->ralar[0]<(oa1->get_margin()+zjtdm+1))
+                  zhijietiaodian=true; //四面楚歌直接跳点
+         }
+
+       if((hal.util->ralar[0]>0.1)&&(hal.util->ralar[0]< oa1->get_margin())&&(hal.util->mr72_switch!=0)) //正前避障数据小于避障距离，且在避障打开的情况
+       {
+           hal.util->mr72_switch=3; //将全部数据用于避障
+           _oa_bizhang_sum_flag=true; //正前方有障碍物时才能避障计数
+           if(Manual_3==1) //关闭定速巡航
+           {
+                   Manual_3=0;
+           }
+       }
+
+               if(hal.util->mr72_switch==4)//
                {
                    update_sector_data(0,   MZBDist[0]*1000);   // d1
                    update_sector_data(45,  MZBDist[1]*1000);   // d2
@@ -312,12 +392,19 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                    update_sector_data(225, MZBDist[5]*1000);  // d6
                    update_sector_data(270, MZBDist[6]*1000);  // d7
                    update_sector_data(315, MZBDist[7]*1000);  // d8
-                   if(Manual_3==1)
-                   {
-                       if( hal.util->mzb_DistLong>0.5&&hal.util->mzb_DistLong< oa1->get_margin())
-                           Manual_3=0;
-                   }
                }
+               else if(hal.util->mr72_switch==3)// 左中前
+               {
+                   update_sector_data(0,   MZBDist[0]*1000);   // d1
+                   update_sector_data(45,  MZBDist[1]*1000);   // d2
+                   update_sector_data(90,  UINT16_VALUE(0xFF,  0xFF));   // d3
+                   update_sector_data(135, UINT16_VALUE(0xFF,  0xFF));   // d4
+                   update_sector_data(180, UINT16_VALUE(0xFF,  0xFF));  // d5
+                   update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
+                   update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
+                   update_sector_data(315, MZBDist[7]*1000);  // d8
+               }
+
                else if(hal.util->mr72_switch==1)//只要正前方
                 {
                     update_sector_data(0,   hal.util->mzb_DistLong*1000);   // d1
@@ -328,11 +415,6 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                     update_sector_data(225, UINT16_VALUE(0xFF,  0xFF));  // d6
                     update_sector_data(270, UINT16_VALUE(0xFF,  0xFF));  // d7
                     update_sector_data(315, UINT16_VALUE(0xFF,  0xFF));  // d8
-                    if(Manual_3==1)
-                    {
-                        if( hal.util->mzb_DistLong>0.5&&hal.util->mzb_DistLong< oa1->get_margin())
-                            Manual_3=0;
-                    }
                 }
                 else //所有都不要了
                 {

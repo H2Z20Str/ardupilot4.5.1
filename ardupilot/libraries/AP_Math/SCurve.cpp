@@ -58,7 +58,11 @@ void SCurve::init()
     delta_unit.zero();
     position_sq = 0.0f;
 }
-
+extern bool _oa_restoration_hzz;
+float time_old=0;
+extern bool _oa_jump_hzz;
+extern int pointc_flag;
+extern float current_time;
 // generate a trigonometric track in 3D space that moves over a straight line
 // between two points defined by the origin and destination
 void SCurve::calculate_track(const Vector3f &origin, const Vector3f &destination,
@@ -111,6 +115,27 @@ void SCurve::calculate_track(const Vector3f &origin, const Vector3f &destination
         INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
         init();
     }
+
+    if(_oa_jump_hzz) //跳点避障，time应该清0
+    {
+        time_old=0;
+        _oa_jump_hzz=false;
+    }
+
+
+    if(_oa_restoration_hzz) //正常的避障
+    {
+        _oa_restoration_hzz=false;
+        time=time_old;
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "time_old=%f",time);
+    }
+    if(pointc_flag==2)
+    {
+        if(current_time<segment[SEG_DECEL_END].end_time)
+            time=segment[SEG_DECEL_END].end_time-current_time;
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "time=%f",time);
+    }
+
 }
 
 // set maximum velocity and re-calculate the path using these limits 设置最大速度，并使用这些限制重新计算路径
@@ -529,8 +554,12 @@ bool SCurve::advance_target_along_track(SCurve &prev_leg, SCurve &next_leg, floa
         next_leg.move_from_pos_vel_accel(dt, target_pos, target_vel, target_accel);
        // gcs().send_text(MAV_SEVERITY_CRITICAL, "time=%.2f ",next_leg.get_time_elapsed());
         if (next_leg.get_time_elapsed() >= (get_time_remaining()*0.5)) { //返回当前经过的时间,序列完成前的剩余时间
+
             s_finished = true;
-            //gcs().send_text(MAV_SEVERITY_CRITICAL, "s_finished ");
+
+            if(pointc_flag==1)s_finished=false;
+
+         //   gcs().send_text(MAV_SEVERITY_CRITICAL, "s_finished ");
         }
     }
 
@@ -601,11 +630,20 @@ float SCurve::time_end() const
 }
 
 // time left before sequence will complete
-float SCurve::get_time_remaining() const
+float SCurve::get_time_remaining() //const
 {
     if (num_segs != segments_max) {
         return 0.0;
     }
+    if(_oa_restoration_hzz==false)time_old=time;
+//    if(pointc_flag==1) //返回垂直点防止过快完成任务
+//    {
+//        if((segment[SEG_DECEL_END].end_time - time)<15)
+//        {
+//            time-=10;
+//        }
+//    }
+   // gcs().send_text(MAV_SEVERITY_CRITICAL, "endt:%f,t:%f",segment[SEG_DECEL_END].end_time ,time);
     return segment[SEG_DECEL_END].end_time - time;
 }
 

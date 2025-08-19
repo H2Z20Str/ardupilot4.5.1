@@ -53,7 +53,7 @@ void Rover::ekf_check()
 //        failsafe_ekf_off_event();   // clear failsafe
 //        //if(time_sum++>200)
 //            gcs().send_text(MAV_SEVERITY_CRITICAL, "HDT Abnormal heading data!!！");//,time_sum=0;
-//       // hal.util->tip=5;
+//       // hal.util->tip=5; ///SAAS
 //        return;
 //    }
 
@@ -61,14 +61,14 @@ void Rover::ekf_check()
     if (ekf_over_threshold()) {
         if(hdt_ber==1)//HDT数据异常时清除故障保护
         {
-           // static unsigned char time_sum=0;
+            static unsigned char time_sum=0;
             ekf_check_state.fail_count = 0;
             ekf_check_state.bad_variance = false;
             AP_Notify::flags.ekf_bad = ekf_check_state.bad_variance;
             failsafe_ekf_off_event();   // clear failsafe
-            //if(time_sum++>200)
-                gcs().send_text(MAV_SEVERITY_CRITICAL, "HDT Abnormal heading data!!！");//,time_sum=0;
-            hal.util->tip=7;
+            if(time_sum++>250)
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "HDT Abnormal heading data!!！"),time_sum=0;
+           // hal.util->tip=7;
             return;
         }
         // if compass is not yet flagged as bad 如果指南针还没有标记为坏

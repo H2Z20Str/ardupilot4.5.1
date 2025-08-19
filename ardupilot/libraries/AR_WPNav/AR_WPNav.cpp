@@ -19,6 +19,7 @@
 #include "AR_WPNav.h"
 #include <GCS_MAVLink/GCS.h>
 #include <AP_InternalError/AP_InternalError.h>
+#include <math.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <stdio.h>
@@ -96,6 +97,8 @@ AR_WPNav::AR_WPNav(AR_AttitudeControl& atc, AR_PosControl &pos_control) :
 }
 float speed_old=0;
 extern Location hzz_old,hzz_old_next,hzz_origin;
+extern bool _oa_jump_hzz;
+extern bool zhijietiaodian;
 // initialise waypoint controller.  speed_max should be set to the maximum speed in m/s (or left at zero to use the default speed)
 void AR_WPNav::init(float speed_max)
 {
@@ -144,11 +147,18 @@ void AR_WPNav::init(float speed_max)
 
     // initialise nudge speed to zero
     set_nudge_speed_max(0);
+    jump_flag=0;
+    _oa_jump_hzz=false;
+    zhijietiaodian=false;
 }
 
 //extern int wp_sum;
 float south_distance=0;
-float south_radius=0;
+float south_radius=0,current_time;
+Location Vertical_pointc,old_destination,current_old_origin; //垂直点坐标
+int pointc_flag=0;
+extern bool _oa_jump_tip;
+
 // update navigation
 void AR_WPNav::update(float dt)
 {
@@ -181,6 +191,26 @@ void AR_WPNav::update(float dt)
     south_radius=_radius;
 
 
+    if(pointc_flag==1)
+    {
+        float ddd=current_loc.get_distance(Vertical_pointc);
+        if(_oa_jump_tip)hal.util->tip=2;
+       // gcs().send_text(MAV_SEVERITY_CRITICAL, "%f",ddd);
+        if(ddd <= _radius+5)
+        {
+            _oa_jump_tip=false;
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "Return to the original waypoint");
+            pointc_flag=2;
+            current_time=current_loc.get_distance(old_destination)/_speed_max;
+            if (set_desired_location(old_destination)) { //返回原目标点
+
+               // gcs().send_text(MAV_SEVERITY_CRITICAL, "退出垂直点");
+                pointc_flag=3;
+            }
+        }
+    }
+
+
     if (!is_active()) {
         _desired_speed_limited = speed;
     }
@@ -204,7 +234,6 @@ void AR_WPNav::update(float dt)
             break;
         }
     }
-
     // update_steering_and_speed 更新跟踪和速度
     update_steering_and_speed(current_loc, dt);
 }
@@ -231,8 +260,158 @@ void AR_WPNav::set_nudge_speed_max(float nudge_speed_max)
 
 // set desired location and (optionally) next_destination
 // next_destination should be provided if known to allow smooth cornering
+//origin 原点，destination，目标点
+
+
+
+void AR_WPNav::south_jump(const Location destination,const Location origin)
+{
+    Location current_loc; //当前位置
+    if (!_orig_and_dest_valid || !AP::ahrs().get_location(current_loc)) {
+        return;
+    }
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "Ct=%d,Cg=%d",current_loc.lat,current_loc.lng);
+    //当前位置到目标点的距离
+//    float current_to_destination = current_loc.get_distance(destination);
+    //当前位置到目标点的方向
+    float current_bearing_cd = current_loc.get_bearing_to(destination);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "_dt=%d,_dg=%d",destination.lat,destination.lng);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "nowD:%f,y:%f",current_to_destination ,current_bearing_cd);
+//
+
+    //当前位置到原目标点的距离
+//    float current_to_jump = current_loc.get_distance(jump_begin);
+    //当前位置到原目标点的距离
+    float jump_bearing_cd = current_loc.get_bearing_to(jump_begin);
+
+    //原目标点到新目标点的距离
+    float jump_to_destination = jump_begin.get_distance(destination);
+
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "Jt=%d,Jg=%d",jump_begin.lat,jump_begin.lng);
+
+  //  gcs().send_text(MAV_SEVERITY_CRITICAL, "oD:%f,y:%f",current_to_jump ,jump_bearing_cd);
+
+    if(jump_to_destination<15) //小于15m应该继续避障
+    {
+        jump_flag=2;
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Need to continue jumping points 1");
+        return;
+    }
+
+    //当距离超过15m时用夹角判定新目标点是否在前方
+    float angle=fabsf(jump_bearing_cd-current_bearing_cd)/100.0; //夹角角度
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "a:%f",angle);
+
+    if(angle<45)
+    {
+        jump_flag=2;
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Need to continue jumping points 2");
+        return;
+    }
+
+    jump_flag=3; //不需要跳点后，再次更换目标点时恢复初始状态
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "No need to continue jumping");
+}
+
+
+void AR_WPNav::south_restore(const Location destination,const Location origin)
+{
+    Location current_loc; //当前位置
+    if (!_orig_and_dest_valid || !AP::ahrs().get_location(current_loc)) {
+        _distance_to_destination = 0.0f;
+        _wp_bearing_cd = 0.0f;
+        return;
+    }
+    //当前位置到目标点的距离
+    float current_to_destination = current_loc.get_distance(destination);
+
+    if(current_to_destination<20) //小于20m就没必要了
+    {
+      //  gcs().send_text(MAV_SEVERITY_CRITICAL, "xxxxx！");
+        if(pointc_flag!=1) pointc_flag=0;
+        return;
+    }
+    //当前位置到目标点的方向
+    float current_bearing_cd = current_loc.get_bearing_to(destination);
+
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "nowD:%f,y:%f",current_to_destination ,current_bearing_cd);
+
+    //原点到目标点的距离
+    float _origin_to_destination = origin.get_distance(destination);
+    //原点到目标点的方向
+    float _origin_bearing_cd = origin.get_bearing_to(destination);
+
+ //    gcs().send_text(MAV_SEVERITY_CRITICAL, "oD:%f,y:%f",_origin_to_destination ,_origin_bearing_cd);
+
+    float L1;//当前位置到航线的垂直点到目标点的距离
+    float angle=fabsf(_origin_bearing_cd-current_bearing_cd)/100.0; //夹角角度
+
+    if(angle>180) angle=360-angle;
+
+    if(angle>88||angle<0.5) //角度大于80就没必要了
+    {
+        if(pointc_flag!=1) pointc_flag=0;
+      //  gcs().send_text(MAV_SEVERITY_CRITICAL, "角度过小,%f",angle);
+        return;
+    }
+
+    L1=current_to_destination*cos(angle*3.1415926/180);
+
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "a:%f,L1:%f",angle ,L1);
+
+    if(L1>20)L1 -=15;
+    else
+   {
+        if(pointc_flag!=1)  pointc_flag=0;
+        return;
+
+   }
+    if(L1>_origin_to_destination)//原点到目标点的距离比垂直点到目标点的距离还要小就不用再走向垂直点了
+    {
+        if(_origin_to_destination>20)
+        {
+            L1=_origin_to_destination/2;
+        }
+        else
+        {
+        //    gcs().send_text(MAV_SEVERITY_CRITICAL, "距离过小！");
+            if(pointc_flag!=1)  pointc_flag=0;
+            return;
+        }
+    }
+    //计算垂直点坐标
+
+    //三角函数比例：垂直点到目标点的距离/原点到目标点的距离
+    float k =L1/_origin_to_destination;
+
+    Vertical_pointc.lat=destination.lat-k*(destination.lat-origin.lat);
+    Vertical_pointc.lng=destination.lng-k*(destination.lng-origin.lng);
+
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "_dt=%d,_dg=%d",Vertical_pointc.lat,Vertical_pointc.lng);
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "xxx=%f",current_loc.get_distance(Vertical_pointc));
+//    if( current_loc.get_distance(Vertical_pointc)<8) //距离垂直点不到10m则返回
+//    {
+//      //  gcs().send_text(MAV_SEVERITY_CRITICAL, "垂直距离过小");
+//       if(pointc_flag!=1)pointc_flag=0;
+//        return;
+//    }
+
+    if(set_desired_location_expect_fast_update(Vertical_pointc)) //这样会导致船抵达这个点后会进入下一个航点,用这个不会产生避障！！
+    {
+        pointc_flag=1;
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Test towards the vertical point!");
+
+        old_destination=destination; //记录原目标点
+        current_old_origin=origin;//记录原原点
+
+    }
+//        if(set_desired_location(Vertical_pointc))
+}
 
 //extern bool _oa_active_hzz;
+bool _oa_restoration_hzz=false;
 bool AR_WPNav::set_desired_location(const Location& destination, Location next_destination)
 {
     //正式
@@ -257,13 +436,28 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
     //如果已设置起点和终点，则为true，_reached_destination为true 4.23
      if (is_active() && _orig_and_dest_valid && _reached_destination) { //如果已经标记了已抵达航点则更新原点
          _origin = _destination; //可行
+
 //         gcs().send_text(MAV_SEVERITY_CRITICAL, "AA");
      } else {
 
          if((destination.lat==hzz_old.lat)&&(destination.lng==hzz_old.lng))//这次的目标点跟上次的一致，则用回原来的原点
          {
              _origin = hzz_origin;
+             _oa_restoration_hzz=true;
+
+             //垂直回到线上
+             if(pointc_flag==0)
+             {
+                 south_restore(destination,_origin);
+                 if(pointc_flag==1) return true; //调用成功则撤回
+             }
 //             gcs().send_text(MAV_SEVERITY_CRITICAL, "BB");
+         }
+         else if(pointc_flag==2)
+         {
+             _origin = current_old_origin;
+         //    gcs().send_text(MAV_SEVERITY_CRITICAL, "ot=%d,og=%d",_origin.lat,_origin.lng);
+       //      gcs().send_text(MAV_SEVERITY_CRITICAL, "用回原点");
          }
 //         else if((destination.lat==hzz_old_next.lat)&&(destination.lng==hzz_old_next.lng))//这次的目标点是下一个目标点，则用回原来的原点
 //         {
@@ -278,20 +472,41 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
     // shift this leg to previous leg
     _scurve_prev_leg = _scurve_this_leg;
 
-    hal.util->tip=0;//跳点后重置消息提示
+
+    if(pointc_flag==3)pointc_flag=0;
+    if(jump_flag==3)jump_flag=0;
+
+    if(_oa_jump_hzz) //跳点避障
+    {
+        //跳点避障后判断一下是否需要再次跳点
+        south_jump(destination,_origin);
+     //   gcs().send_text(MAV_SEVERITY_CRITICAL, "p=%d,j=%d",pointc_flag,jump_flag);
+        if(pointc_flag==0&&jump_flag!=2)
+        {
+            south_restore(destination,_origin);
+            if(pointc_flag==1) return true; //调用成功则撤回
+        }
+    }
+
+
     //正式
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "dt=%ld,dg=%ld",destination.lat,destination.lng);
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "nt=%ld,ng=%ld",next_destination.lat,next_destination.lng);
 
     //仿真
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "dt=%d,dg=%d",destination.lat,destination.lng);
-//    gcs().send_text(MAV_SEVERITY_CRITICAL, "nt=%d,ng=%d",next_destination.lat,next_destination.lng);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "ot=%d,og=%d",_origin.lat,_origin.lng);
 
     // initialise some variables
    // _origin = _destination; //上一个点位置,但经常会变化。
     _destination = destination;
     _orig_and_dest_valid = true;
     _reached_destination = false;
+
+//    if(pointc_flag)
+//    {
+//        _destination=Vertical_pointc;
+//    }
 
 //        if (!_oa_active_hzz) {
 //                //获取旧的位置信息
@@ -336,7 +551,7 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
 //        gcs().send_text(MAV_SEVERITY_CRITICAL, "SS=%.2f",_pos_control.get_accel_max());
         _scurve_this_leg.calculate_track(Vector3f{origin_NE.x, origin_NE.y, 0.0f},              // origin
                                          Vector3f{destination_NE.x, destination_NE.y, 0.0f},    // destination
-                                         (hal.util->mode_flag?_pos_control.get_speed_max()*2:_pos_control.get_speed_max()),//手动变自动第一次设定速度*2
+                                         _pos_control.get_speed_max(),//手动变自动第一次设定速度*2 (hal.util->mode_flag?_pos_control.get_speed_max()*2:
                                          _pos_control.get_speed_max(),  // speed up (not used)
                                          _pos_control.get_speed_max(),  // speed down (not used)
                                          _pos_control.get_accel_max(),  // forward back acceleration 前后加速度
@@ -561,6 +776,22 @@ void AR_WPNav::advance_wp_target_along_track(const Location &current_loc, float 
 //             _reached_destination = near_wp || past_wp;
 //         }
 
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "%d",pointc_flag);
+//    if(pointc_flag==1)
+//    {
+//        float ddd=current_loc.get_distance(Vertical_pointc);
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, "%f",ddd);
+//        if(ddd <= _radius+5)
+//        {
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "返回原来航点");
+//            pointc_flag=2;
+//            if (!set_desired_location(hzz_old)) { //返回原目标点
+//
+//                gcs().send_text(MAV_SEVERITY_CRITICAL, "退出垂直点");
+//            }
+//            pointc_flag=3;
+//        }
+//    }
 
     // check if we've reached the waypoint 检查我们是否已到达航路点
     if (!_reached_destination && s_finished)
@@ -639,6 +870,14 @@ void AR_WPNav::update_distance_and_bearing_to_destination()
     }
     _distance_to_destination = current_loc.get_distance(_destination);
     _wp_bearing_cd = current_loc.get_bearing_to(_destination);
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "nowD:%f,y:%f",_distance_to_destination ,_wp_bearing_cd);
+//    float _origin_to_destination,_origin_bearing_cd;
+//    _origin_to_destination = _origin.get_distance(_destination);
+//    _origin_bearing_cd = _origin.get_bearing_to(_destination);
+//
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "oD:%f,y:%f",_origin_to_destination ,_origin_bearing_cd);
+
 }
 
 

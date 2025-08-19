@@ -118,6 +118,10 @@ const AP_Param::GroupInfo AP_MotorsUGV::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("THST_ASYM", 14, AP_MotorsUGV, _thrust_asymmetry, 1.0f),
 
+
+    AP_GROUPINFO("VEL_P_L", 15, AP_MotorsUGV, left_p, 1.0f),
+    AP_GROUPINFO("VEL_P_R", 16, AP_MotorsUGV, right_p, 1.0f),
+
     AP_GROUPEND
 };
 
@@ -904,9 +908,30 @@ void AP_MotorsUGV::output_skid_steering(bool armed, float steering, float thrott
         motor_left *= thrust_asymmetry;
     }
 
+
     // send pwm value to each motor
     output_throttle(SRV_Channel::k_throttleLeft, 100.0f * motor_left, dt);
     output_throttle(SRV_Channel::k_throttleRight, 100.0f * motor_right, dt);
+
+
+//    if(hal.util->hzz_test[0]==9)
+//    {
+//       // gcs().send_text(MAV_SEVERITY_CRITICAL, "L,%f,R,%f",motor_left,motor_right); //hzz
+//
+//        //左转 左负右正,减少正值，left_p
+//        if(motor_left<-0.01&&motor_right>0.01)
+//        {
+//            output_throttle(SRV_Channel::k_throttleLeft, 100.0f * motor_left, dt);
+//            output_throttle(SRV_Channel::k_throttleRight, 100.0f * motor_right*left_p, dt);
+//        }
+//        //右转 左正右负,减少正值，right_p
+//        if(motor_left>0.01&&motor_right<-0.01)
+//        {
+//            output_throttle(SRV_Channel::k_throttleLeft, 100.0f * motor_left*right_p, dt);
+//            output_throttle(SRV_Channel::k_throttleRight, 100.0f * motor_right, dt);
+//        }
+//    }
+
 }
 
 // output for omni frames

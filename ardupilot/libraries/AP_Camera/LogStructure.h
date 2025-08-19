@@ -26,8 +26,8 @@ struct PACKED log_Camera {
     uint64_t time_us;
     uint8_t  instance;
     uint16_t image_number;
-    uint32_t gps_time;
-    uint16_t gps_week;
+    float gps_time;//    uint32_t gps_time;
+    float gps_week;//    uint16_t gps_week;
     int32_t  latitude;
     int32_t  longitude;
     int32_t  altitude;
@@ -37,9 +37,9 @@ struct PACKED log_Camera {
     int16_t  pitch;
     uint16_t yaw;
 };
-
+ //"QBHIHLLeeeccC","TimeUS,I,Img,GPSTime,GPSWeek,
 #define LOG_STRUCTURE_FROM_CAMERA \
     { LOG_CAMERA_MSG, sizeof(log_Camera), \
-      "CAM", "QBHIHLLeeeccC","TimeUS,I,Img,GPSTime,GPSWeek,Lat,Lng,Alt,RelAlt,GPSAlt,R,P,Y", "s#---DUmmmddd", "F----GGBBBBBB" }, \
+      "CAM", "QBHffLLeeeccC","TimeUS,I,Img,SL,SH,Lat,Lng,Alt,RelAlt,GPSAlt,R,P,Y", "s#---DUmmmddd", "F----GGBBBBBB" }, \
     { LOG_TRIGGER_MSG, sizeof(log_Camera), \
-      "TRIG", "QBHIHLLeeeccC","TimeUS,I,Img,GPSTime,GPSWeek,Lat,Lng,Alt,RelAlt,GPSAlt,R,P,Y", "s#---DUmmmddd", "F----GGBBBBBB" },
+      "TRIG", "QBHffLLeeeccC","TimeUS,I,Img,SL,SH,Lat,Lng,Alt,RelAlt,GPSAlt,R,P,Y", "s#---DUmmmddd", "F----GGBBBBBB" },

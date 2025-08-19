@@ -482,6 +482,7 @@ public:
         AP_Int32 OA_Avoid_ms;
         AP_Int16 OA_Avoid_sum;
         AP_Int16 OA_Avoid_en;
+        AP_Int32 OA_Avoid_off_ms; //关闭避障时间
 
         //浅水避障参数
         AP_Int16 velocity_en;
@@ -491,10 +492,12 @@ public:
         AP_Int32 OA_deep_time;
         AP_Int32 OA_deeps;
         AP_Float OA_deep_v;
+        AP_Float OA_deep_k;
 
         //
         AP_Int32 hzz_test;
-        AP_Float speed_radius;
+        AP_Float speed_radius;//转弯速度
+        AP_Int32 times_radius; //出弯时间
 
         AP_Int16 batter_rtl;
         AP_Int16 batter_switch;
@@ -508,7 +511,26 @@ public:
 
         AP_Int32 POS_SUM;
 
- //       AP_Int8 BD_south; //beidou日志记录
+        AP_Float loiter_Kp;
+        AP_Float loiter_Ki;
+        AP_Float loiter_Kd;
+        AP_Float loiter_turn_rate;
+
+      AP_Int8 BD_south; //beidou
+
+      //30船左侧油门pwm限制
+      AP_Int16 velocity30_max_1;
+      AP_Int16 velocity30_trim_1;
+      AP_Int16 velocity30_min_1;
+      AP_Int16 velocity30_auto_1; //自动
+
+      //30船右侧油门限制
+      AP_Int16 velocity30_max_2;
+      AP_Int16 velocity30_trim_2;
+      AP_Int16 velocity30_min_2;
+      AP_Int16 velocity30_auto_2;//自动
+      AP_Int16 OA_TD;
+      AP_Float OA_TD_m;
 
 
 };

@@ -1,12 +1,14 @@
 #include "AP_Camera_Backend.h"
 #include <AP_Mount/AP_Mount.h>
 #include <AP_Logger/AP_Logger_config.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if AP_CAMERA_ENABLED && HAL_LOGGING_ENABLED
 
 #include <AP_Logger/AP_Logger.h>
 #include <AP_GPS/AP_GPS.h>
-
+extern int cam_sum;
+extern const AP_HAL::HAL &hal;
 // Write a Camera packet.  Also writes a Mount packet if available
 void AP_Camera_Backend::Write_CameraInfo(enum LogMessages msg, uint64_t timestamp_us)
 {
@@ -52,9 +54,9 @@ void AP_Camera_Backend::Write_CameraInfo(enum LogMessages msg, uint64_t timestam
         LOG_PACKET_HEADER_INIT(static_cast<uint8_t>(msg)),
         time_us     : timestamp_us,
         instance    : _instance,
-        image_number: image_index,
-        gps_time    : gps.time_week_ms(),
-        gps_week    : gps.time_week(),
+        image_number: (uint16_t)cam_sum,//image_index,
+        gps_time    : hal.util->deep_log,//gps.time_week_ms(),
+        gps_week    : hal.util->deep_mav_H, //gps.time_week(),
         latitude    : current_loc.lat,
         longitude   : current_loc.lng,
         altitude    : altitude,

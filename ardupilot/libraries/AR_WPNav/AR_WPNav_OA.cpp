@@ -28,7 +28,15 @@ int32_t time_ms_old=0;
 Location hzz_old,hzz_old_next,hzz_origin,hzz_origin_old;
 char hezz=0,hezz_flag=0;
 bool _oa_active_hzz;
+bool _oa_jump_hzz=false;
+bool _oa_jump_tip=false;
+bool _oa_bizhang_sum_flag=false;
 // update navigation
+extern int pointc_flag;
+extern Location old_destination,Vertical_pointc;
+int bizhang_sum=0;
+extern bool zhijietiaodian;
+
 void AR_WPNav_OA::update(float dt)
 {
     // exit immediately if no current location, origin or destination
@@ -45,6 +53,8 @@ void AR_WPNav_OA::update(float dt)
     // run path planning around obstacles
     bool stop_vehicle = false;
 
+
+
     // backup _origin, _destination and _next_destination when not doing oa 不执行oa时的backup_origin、_destination和_next_destination
 //    if(hal.util->hzz_test[7]!=1)
     {
@@ -53,10 +63,13 @@ void AR_WPNav_OA::update(float dt)
             _destination_oabak = _destination;
             _next_destination_oabak = _next_destination;
 
+           // if(pointc_flag==0)
+            {
                 //获取旧的位置信息
                 hzz_old= _destination;
                // hzz_old_next= _next_destination;//没获取到
                 hzz_origin= _origin;
+            }
         }
     }
 
@@ -90,6 +103,7 @@ void AR_WPNav_OA::update(float dt)
 
                  _origin = hzz_origin;//恢复原来的原点
                  _destination = hzz_old; //恢复原来的目标点
+                 _oa_jump_hzz=false;
 
                 // object avoidance has become inactive so reset target to original destination 目标回避已变为非活动状态，因此将目标重置为原始目的地
                 if (!AR_WPNav::set_desired_location(hzz_old)) {//_destination_oabak
@@ -133,7 +147,7 @@ void AR_WPNav_OA::update(float dt)
                         _oa_origin = oa_origin_new;
                         _oa_destination = oa_destination_new;
                         hal.util->tip=1;
-                        gcs().send_text(MAV_SEVERITY_CRITICAL, "避障绕行！");
+                        gcs().send_text(MAV_SEVERITY_CRITICAL, "避障绕行1!");
                     } else {
                         // this should never happen 这不应该发生
                         INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
@@ -154,7 +168,17 @@ void AR_WPNav_OA::update(float dt)
                             _oa_origin = oa_origin_new;
                             _oa_destination = oa_destination_new;
                             hal.util->tip=1;
-                            gcs().send_text(MAV_SEVERITY_CRITICAL, "避障绕行！");
+
+                           // if( _oa_bizhang_sum_flag==true)
+                                hal.util->bizhang_sum++; //避障
+                            _oa_bizhang_sum_flag=false;//清除重置
+                            gcs().send_text(MAV_SEVERITY_CRITICAL, "避障绕行:%d!",hal.util->bizhang_sum);
+                            gcs().send_text(MAV_SEVERITY_CRITICAL, "0:%.2f,1:%.2f,2:%.2f,3:%.2f,4:%.2f,5:%.2f,6:%.2f,7:%.2f", hal.util->ralar[0],hal.util->ralar[1],hal.util->ralar[2],hal.util->ralar[3],hal.util->ralar[4],hal.util->ralar[5],hal.util->ralar[6],hal.util->ralar[7]);
+                            //前视避障计数输出
+                           if(hal.util->hzz_test[1]==1&&hal.util->bizhang_sum!=0){
+                                  gcs().send_text(MAV_SEVERITY_CRITICAL, "avoid_s=%d",hal.util->bizhang_sum);
+                               }
+
                         } else {
                         // this should never happen
                             INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
@@ -167,12 +191,9 @@ void AR_WPNav_OA::update(float dt)
 
             } // switch (path_planner_used) {
         } // switch (oa_retstate) {
-
-
-
     } // if (oa != nullptr) {
 
-    if(_oa_active==true) hal.util->bizhang_sum++;
+//    if(_oa_active==true) hal.util->bizhang_sum++; //避障
 
     update_oa_distance_and_bearing_to_destination();
 
@@ -181,29 +202,51 @@ void AR_WPNav_OA::update(float dt)
     {
         hal.util->bizhang_sum=0;
         hal.util->deep_sum =0;
+        hal.util->deep_sleep_flag=0;
         wp_sum_old=wp_sum;
         _reached_destination = false; //重置
+        if(pointc_flag!=1)pointc_flag=0;
     }
 
         //浅水避障
            if(hal.util->hzz_test[2]==1&&hal.util->deep_sum!=0)
                gcs().send_text(MAV_SEVERITY_CRITICAL, "deep_s=%d",hal.util->deep_sum);
+
            if(hal.util->deep_sum>=hal.util->OA_deep_sum)//水深
            {
                hal.util->deep_sum=0;
                hal.util->deep_fllag=1;
                hal.util->deep_sleep_flag=0;
-               _reached_destination = true;
+
                hal.util->tip=3;
                gcs().send_text(MAV_SEVERITY_CRITICAL, "浅水避障");
 
+               //浅水避障跳点，浅水避障是减速慢行并不会超出原航线
+//               _origin = hzz_origin;//恢复原来的原点
+//               _destination = hzz_old; //恢复原来的目标点
+//               _nav_control_type = NavControllerType::NAV_SCURVE;
+
+               if(AR_WPNav::jump_flag==0)
+               {
+                   AR_WPNav::jump_begin=hzz_old; //记录首次避障跳点前的目标点
+                   AR_WPNav::jump_flag=1;
+               }
+               _oa_jump_hzz=true;
+               if(pointc_flag==1) //当走向垂直点时再次跳点避障，则退回原目标点
+               {
+                   _destination = old_destination; //恢复原来的目标点
+                   //是否需要继续跳点？
+                   AR_WPNav::jump_begin=Vertical_pointc; //以垂直点作为基准点
+                   AR_WPNav::jump_flag=1;
+               }
+               pointc_flag=0;
+
+               //跳点
+               _reached_destination = true;
            }
             _oa_active_hzz=_oa_active;
 
-            //前视避障
-           if(hal.util->hzz_test[1]==1&&hal.util->bizhang_sum!=0){
-                  gcs().send_text(MAV_SEVERITY_CRITICAL, "avoid_s=%d",hal.util->bizhang_sum);
-               }
+
 
 
            const int32_t ms_now = AP_HAL::millis();
@@ -212,6 +255,7 @@ void AR_WPNav_OA::update(float dt)
                 if(ms_now-time_ms_old>=hal.util->OA_ms)//计数超过OA_ms时间，则清零，重新计数
                 {
                     hal.util->bizhang_sum=0;
+
                 }
             }
             else //计数不相等，重新
@@ -220,20 +264,56 @@ void AR_WPNav_OA::update(float dt)
                 hal.util->bizhang_sum_old=hal.util->bizhang_sum;//更新计数
             }
 
-            if(hal.util->bizhang_sum>(hal.util->OA_sum ))//避障次数大于设定值，则跳点
-            {
-                _reached_destination = true;
 
+
+            if((hal.util->bizhang_sum>=(hal.util->OA_sum ))||zhijietiaodian)//避障次数大于设定值，则跳点
+            {
+                zhijietiaodian=false;
+                hal.util->bizhang_sum=0;
                     _origin = hzz_origin;//恢复原来的原点
                     _destination = hzz_old; //恢复原来的目标点
                     _nav_control_type = NavControllerType::NAV_SCURVE;
-                    _oa_active=false;
 
-                hal.util->bizhang_sum=0;
+
+                    if(AR_WPNav::jump_flag==0)
+                    {
+                        AR_WPNav::jump_begin=hzz_old; //记录首次避障跳点前的目标点
+                        AR_WPNav::jump_flag=1;
+                    }
+                    _oa_active=false;
+                    _oa_jump_hzz=true;
+                    _oa_jump_tip=true;
+
+                    hal.util->OA_off_time=ms_now;//获取跳点避障的时间
+
+
                 hal.util->tip=2;
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "Jumping avoidance");
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "无法绕开障碍物，驶入下一条航线");
 
+                if(pointc_flag==1) //当走向垂直点时再次跳点避障，则退回原目标点
+                {
+                    _destination = old_destination; //恢复原来的目标点
+                    //是否需要继续跳点？
+                    AR_WPNav::jump_begin=Vertical_pointc; //以垂直点作为基准点
+                    AR_WPNav::jump_flag=1;
+                }
+                pointc_flag=0;
+                _reached_destination = true;
+            }
+
+            if(AR_WPNav::jump_flag==2)
+            {
+
+                if(pointc_flag==1) //当走向垂直点时再次跳点避障，则退回原目标点
+                {
+                    _destination = old_destination; //恢复原来的目标点
+                }
+                pointc_flag=0;
+                _reached_destination = true;
+                AR_WPNav::jump_flag=1;
+                _oa_jump_hzz=true;
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "Continuous jump point");  //连续跳点
             }
 
 

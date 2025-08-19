@@ -22,6 +22,35 @@ struct PACKED log_SPOS {
     float  deep_water_5;
     float  start;
 };
+
+extern float des_old,des_lv,des_now,yaw_oldl,yaw_nowl,turn_rate1;
+struct PACKED log_loitS {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float  des_old_log;
+    float  des_lv_log;
+    float  des_now_log;
+    float  yaw_oldl_log;
+    float  yaw_nowl_log;
+    float  turn_rate_log;
+};
+
+void Rover::Log_Write_loit()
+{
+    struct log_loitS pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_LOIT_MSG),
+        time_us             : AP_HAL::micros64(),
+        des_old_log         : des_old,//低频水深
+        des_lv_log          :des_lv,
+        des_now_log         : des_now, //滤波水深1
+        yaw_oldl_log        : yaw_oldl, //滤波水深2
+        yaw_nowl_log        : yaw_nowl, //滤波水深3
+        turn_rate_log       :turn_rate1, //滤波水深4
+    };
+    logger.WriteBlock(&pkt, sizeof(pkt));
+}
+
+
 //int32_t GPS_now[3];
 
 extern float deep_water_1,deep_water_2,deep_water_3,deep_water_4,deep_water_5,deep_start;
@@ -364,7 +393,6 @@ const LogStructure Rover::log_structure[] = {
 // @Field: vX: Target velocity, X-Axis
 // @Field: vY: Target velocity, Y-Axis
 // @Field: vZ: Target velocity, Z-Axis
-    
     { LOG_GUIDEDTARGET_MSG, sizeof(log_GuidedTarget),
       "GUIP",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ", "s-mmmnnn", "F-000000" },
 
@@ -375,6 +403,8 @@ const LogStructure Rover::log_structure[] = {
         "SPOS",  "Qffffffff", "TimeUS,dpL,dpH,dpv1,dpv2,dpv3,dpv4,dpv5,sta", "s--------", "F--------" },
       { LOG_SOUTH_MSG, sizeof(log_south),
         "SOUT",  "QZ",     "TimeUS,Message", "s-", "F-"},
+      { LOG_LOIT_MSG, sizeof(log_loitS),
+        "LOIT",  "Qffffff",     "TimeUS,dold,dlv,dnow,yold,ynow,trate", "s------", "F------"},
 };
 
 void Rover::log_init(void)

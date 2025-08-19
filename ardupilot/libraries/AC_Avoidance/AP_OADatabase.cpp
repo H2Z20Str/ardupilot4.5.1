@@ -230,7 +230,7 @@ uint8_t AP_OADatabase::get_send_to_gcs_flags(const OA_DbItemImportance importanc
     return 0x0;
 }
 
-// returns true when there's more work in the queue to do
+// returns true when there's more work in the queue to do 当队列中有更多工作要做时返回true
 bool AP_OADatabase::process_queue()
 {
     if (!healthy()) {
@@ -242,7 +242,10 @@ bool AP_OADatabase::process_queue()
     // while could get us stuck here longer than expected if we're getting
     // a lot of values pushing into it while we're trying to empty it. With
     // the for we know we will exit at an expected time
-    const uint16_t queue_available = MIN(_queue.items->available(), 100U);
+    //通过将这些条目移动到数据库中来处理队列使用固定大小的for比while（！空）更好，
+    //因为当我们试图清空队列时，如果有很多值被推入队列，while可能会让我们在这里停留的时间比预期的要长。
+   // 有了for，我们知道我们会在预期的时间退出
+    const uint16_t queue_available = MIN(_queue.items->available(), 100U); //返回可从队列前面读取的对象数，最多100个
     if (queue_available == 0) {
         return false;
     }
@@ -253,7 +256,7 @@ bool AP_OADatabase::process_queue()
         bool pop_success;
         {
             WITH_SEMAPHORE(_queue.sem);
-            pop_success = _queue.items->pop(item);
+            pop_success = _queue.items->pop(item);//从队列前面弹出最早的对象
         }
         if (!pop_success) {
             return false;
@@ -262,6 +265,7 @@ bool AP_OADatabase::process_queue()
         item.send_to_gcs = get_send_to_gcs_flags(item.importance);
 
         // compare item to all items in database. If found a similar item, update the existing, else add it as a new one
+        ////将项目与数据库中的所有项目进行比较。如果发现类似项目，请更新现有项目，否则将其添加为新项目
         bool found = false;
         for (uint16_t i=0; i<_database.count; i++) {
             if (is_close_to_item_in_database(i, item)) {

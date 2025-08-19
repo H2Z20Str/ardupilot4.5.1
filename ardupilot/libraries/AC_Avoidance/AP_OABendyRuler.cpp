@@ -81,35 +81,39 @@ AP_OABendyRuler::AP_OABendyRuler()
 // run background task to find best path
 // returns true and updates origin_new and destination_new if a best path has been found.  returns false if OA is not required
 // bendy_type is set to the type of BendyRuler used
+//运行后台任务以找到最佳路径
+//如果找到了最佳路径，则返回true并更新origin_new和destination_new。如果不需要OA，则返回false
+//bendy_type设置为所使用的BendyRuler的类型
 bool AP_OABendyRuler::update(const Location& current_loc, const Location& destination, const Vector2f &ground_speed_vec, Location &origin_new, Location &destination_new, OABendyType &bendy_type, bool proximity_only)
 {
-    // bendy ruler always sets origin to current_loc
+    // bendy ruler always sets origin to current_loc 弯曲标尺总是将原点设置为currentloc
     origin_new = current_loc;
 
-    // init bendy_type returned
+    // init bendy_type returned 初始化bendy类型返回
     bendy_type = OABendyType::OA_BENDY_DISABLED;
 
-    // calculate bearing and distance to final destination
+    // calculate bearing and distance to final destination 计算方位和到最终目的地的距离
     const float bearing_to_dest = current_loc.get_bearing_to(destination) * 0.01f;
     const float distance_to_dest = current_loc.get_distance(destination);
 
-    // make sure user has set a meaningful value for _lookahead
+    // make sure user has set a meaningful value for _lookahead 确保用户为_lookahead设置了有意义的值
     _lookahead.set(MAX(_lookahead,1.0f));
 
-    // lookahead distance is adjusted dynamically based on avoidance results
+    // lookahead distance is adjusted dynamically based on avoidance results  根据避让结果动态调整前视距离
     _current_lookahead = constrain_float(_current_lookahead, _lookahead * 0.5f, _lookahead);
 
     // calculate lookahead dist and time for step1.  distance can be slightly longer than
     // the distance to the destination to allow room to dodge after reaching the destination
+    //计算步骤1的前瞻距离和时间。距离可以比到达目的地的距离稍长，以便在到达目的地后有躲避的空间
     const float lookahead_step1_dist = MIN(_current_lookahead, distance_to_dest + OA_BENDYRULER_LOOKAHEAD_PAST_DEST);
 
-    // calculate lookahead dist for step2
+    // calculate lookahead dist for step2 计算步骤2的前瞻距离
     const float lookahead_step2_dist = _current_lookahead * OA_BENDYRULER_LOOKAHEAD_STEP2_RATIO;
 
-    // get ground course
+    // get ground course 获得地面路线
     float ground_course_deg;
     if (ground_speed_vec.length_squared() < OA_BENDYRULER_LOW_SPEED_SQUARED) {
-        // with zero ground speed use vehicle's heading
+        // with zero ground speed use vehicle's heading 在零地面速度下使用车辆的航向
         ground_course_deg = AP::ahrs().yaw_sensor * 0.01f;
     } else {
         ground_course_deg = degrees(ground_speed_vec.angle());
@@ -133,14 +137,15 @@ bool AP_OABendyRuler::update(const Location& current_loc, const Location& destin
     return ret;
 }
 
-// Search for path in the horizontal directions
+// Search for path in the horizontal directions 在水平方向上搜索路径
 bool AP_OABendyRuler::search_xy_path(const Location& current_loc, const Location& destination, float ground_course_deg, Location &destination_new, float lookahead_step1_dist, float lookahead_step2_dist, float bearing_to_dest, float distance_to_dest, bool proximity_only) 
 {
-    // check OA_BEARING_INC definition allows checking in all directions
-    static_assert(360 % OA_BENDYRULER_BEARING_INC_XY == 0, "check 360 is a multiple of OA_BEARING_INC");
+    // check OA_BEARING_INC definition allows checking in all directions //check OA_BEARING_INC定义允许全方位检查
+    static_assert(360 % OA_BENDYRULER_BEARING_INC_XY == 0, "check 360 is a multiple of OA_BEARING_INC"); //车辆周围每5度检查一次
 
-    // search in OA_BENDYRULER_BEARING_INC degree increments around the vehicle alternating left
+    // search in OA_BENDYRULER_BEARING_INC degree increments around the vehicle alte rnating left
     // and right. For each direction check if vehicle would avoid all obstacles
+    //以OA_BENDYRULER_BEARING_INC度增量围绕车辆左右高度进行搜索。对于每个方向，检查车辆是否能避开所有障碍物
     float best_bearing = bearing_to_dest;
     float best_bearing_margin = -FLT_MAX;
     bool have_best_bearing = false;
@@ -149,22 +154,23 @@ bool AP_OABendyRuler::search_xy_path(const Location& current_loc, const Location
 
     for (uint8_t i = 0; i <= (170 / OA_BENDYRULER_BEARING_INC_XY); i++) {
         for (uint8_t bdir = 0; bdir <= 1; bdir++) {
-            // skip duplicate check of bearing straight towards destination
+            // skip duplicate check of bearing straight towards destination 跳过直接朝向目的地的方位重复检查
             if ((i==0) && (bdir > 0)) {
                 continue;
             }
-            // bearing that we are probing
+            // bearing that we are probing 我们正在探索的轴承
             const float bearing_delta = i * OA_BENDYRULER_BEARING_INC_XY * (bdir == 0 ? -1.0f : 1.0f);
             const float bearing_test = wrap_180(bearing_to_dest + bearing_delta);
 
-            // ToDo: add effective groundspeed calculations using airspeed
-            // ToDo: add prediction of vehicle's position change as part of turn to desired heading
+            // ToDo: add effective groundspeed calculations using airspeed 使用空速添加有效的地速计算
+            // ToDo: add prediction of vehicle's position change as part of turn to desired heading 将车辆位置变化的预测作为转向所需航向的一部分
 
-            // test location is projected from current location at test bearing
+            // test location is projected from current location at test bearing 测试位置是从测试轴承的当前位置投影出来的
             Location test_loc = current_loc;
             test_loc.offset_bearing(bearing_test, lookahead_step1_dist);
+           //根据方位和距离推断纬度/经度。请注意，在100米的距离内，此函数的精度约为1毫米。此函数的优点是它在相对位置工作，因此即使在处理小距离和浮点数时也能保持精度
 
-            // calculate margin from obstacles for this scenario
+            // calculate margin from obstacles for this scenario 计算此场景中障碍物的余量
             float margin = calc_avoidance_margin(current_loc, test_loc, proximity_only);
             if (margin > best_margin) {
                 best_margin_bearing = bearing_test;

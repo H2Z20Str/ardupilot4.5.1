@@ -730,7 +730,7 @@ void AP_GPS::detect_instance(uint8_t instance)
   run detection step for one GPS instance. If this finds a GPS then it
   will return it - otherwise nullptr
  */
-char instance_hzz=0;
+
 AP_GPS_Backend *AP_GPS::_detect_instance(uint8_t instance)
 {
     struct detect_state *dstate = &detect_state[instance];
@@ -845,7 +845,6 @@ AP_GPS_Backend *AP_GPS::_detect_instance(uint8_t instance)
 
     while (bytecount-- > 0) {
         const uint8_t data = _port[instance]->read();
-        instance_hzz=instance;
         (void)data;  // if all backends are compiled out then "data" is unused
 
 #if AP_GPS_UBLOX_ENABLED
@@ -1467,7 +1466,7 @@ uint16_t AP_GPS::gps_yaw_cdeg(uint8_t instance) const
     }
     return yaw_cd;
 }
-//extern unsigned char BD_OFF;
+extern unsigned char BD_OFF;
 
 void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
 {
@@ -1495,7 +1494,7 @@ void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
         get_vdop(0),
         ground_speed(0)*100,  // cm/s
         ground_course(0)*100, // 1/100 degrees,
-        num_sats(0), //43\测试搜星数量,(num_sats(0)/1.6>22)?22:((int)(num_sats(0)/1.6)),//BD_OFF?((num_sats(0)/1.6>22)?22:((int)(num_sats(0)/1.6))):num_sats(0),//
+        BD_OFF?((num_sats(0)/1.6>22)?22:((int)(num_sats(0)/1.6))):num_sats(0),//num_sats(0), //43\测试搜星数量,(num_sats(0)/1.6>22)?22:((int)(num_sats(0)/1.6)),//
         height_elipsoid_mm,   // Ellipsoid height in mm
         hacc * 1000,          // one-sigma standard deviation in mm
         vacc * 1000,          // one-sigma standard deviation in mm
@@ -1503,7 +1502,7 @@ void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
         0,                    // TODO one-sigma heading accuracy standard deviation
         gps_yaw_cdeg(0));
 }
-
+char instance_hzz=0;
 #if GPS_MAX_RECEIVERS > 1
 void AP_GPS::send_mavlink_gps2_raw(mavlink_channel_t chan)
 {
@@ -1524,6 +1523,8 @@ void AP_GPS::send_mavlink_gps2_raw(mavlink_channel_t chan)
     horizontal_accuracy(1, hacc);
     vertical_accuracy(1, vacc);
     speed_accuracy(1, sacc);
+   // gcs().send_text(MAV_SEVERITY_CRITICAL, "num_sats(1)=%d",num_sats(1));
+    if(num_sats(1)!=0)instance_hzz=1;
     mavlink_msg_gps2_raw_send(
         chan,
         last_fix_time_ms(1)*(uint64_t)1000,

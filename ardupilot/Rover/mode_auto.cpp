@@ -116,7 +116,7 @@ void ModeAuto::update()
             break;
         }
 
-        case SubMode::HeadingAndSpeed:
+        case SubMode::HeadingAndSpeed: //转向
         {
             if (!_reached_heading) {
                 // run steering and throttle controllers 运行转向和油门控制器
@@ -875,6 +875,7 @@ void ModeAuto::do_nav_set_yaw_speed(const AP_Mission::Mission_Command& cmd)
 /********************************************************************************/
 //  Verify Nav (Must) commands
 /********************************************************************************/
+int32_t wp_time=0,wp_flag=0;
 bool ModeAuto::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
 {
     // exit immediately if we haven't reached the destination
@@ -898,8 +899,10 @@ bool ModeAuto::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
         } else {
             // send simpler message to GCS
             gcs().send_text(MAV_SEVERITY_INFO, "Reached waypoint #%u", (unsigned int)cmd.index);
-
+            wp_time=AP_HAL::millis();//获取现在的时间
+            wp_flag=1;
         }
+
         wp_sum=cmd.index+1;
     }
 

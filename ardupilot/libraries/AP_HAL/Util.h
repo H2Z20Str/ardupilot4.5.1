@@ -94,6 +94,8 @@ public:
     uint16_t bizhang_sum_old=0; //避障上次计数
     int32_t OA_ms=10000;        //清零时间
     int32_t OA_sum=50;          //避障计数值
+    int32_t OA_off_ms=8000;          //避障关闭时间/8s
+    int32_t OA_off_time=0;          //跳点避障初始化时间
 
     //电池数据
     float battery_voltage=0;//电池电压
