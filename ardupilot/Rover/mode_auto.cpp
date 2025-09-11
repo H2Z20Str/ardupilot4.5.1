@@ -802,6 +802,9 @@ bool ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd, bool always_sto
     } else {
         // retrieve and sanitize next destination location 检索下一个目的地位置
         Location next_cmdloc = next_cmd.content.location;
+
+    //    gcs().send_text(MAV_SEVERITY_CRITICAL, "%d _dt=%d,_dg=%d",cmd.index+1,next_cmdloc.lat,next_cmdloc.lng);
+
         next_cmdloc.sanitize(cmdloc);
         if (!set_desired_location(cmdloc, next_cmdloc)) { //设置所需的驾驶位置
             return false;

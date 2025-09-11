@@ -32,12 +32,12 @@ void ModeSmartRTL::update()
 {
     switch (smart_rtl_state) {
         case SmartRTLState::WaitForPathCleanup:
-            // check if return path is computed and if yes, begin journey home
+            // check if return path is computed and if yes, begin journey home 检查是否计算了返回路径，如果是，则开始回家的旅程
             if (g2.smart_rtl.request_thorough_cleanup()) {
                 smart_rtl_state = SmartRTLState::PathFollow;
                 _load_point = true;
             }
-            // Note: this may lead to an unnecessary 20ms slow down of the vehicle (but it is unlikely)
+            // Note: this may lead to an unnecessary 20ms slow down of the vehicle (but it is unlikely) 注意：这可能会导致车辆不必要的20ms减速（但不太可能）
             stop_vehicle();
             break;
 

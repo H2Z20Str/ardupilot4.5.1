@@ -127,13 +127,13 @@ void SCurve::calculate_track(const Vector3f &origin, const Vector3f &destination
     {
         _oa_restoration_hzz=false;
         time=time_old;
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "time_old=%f",time);
+     //   gcs().send_text(MAV_SEVERITY_CRITICAL, "time_old=%f",time);
     }
     if(pointc_flag==2)
     {
         if(current_time<segment[SEG_DECEL_END].end_time)
             time=segment[SEG_DECEL_END].end_time-current_time;
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "time=%f",time);
+      //  gcs().send_text(MAV_SEVERITY_CRITICAL, "time=%f",time);
     }
 
 }

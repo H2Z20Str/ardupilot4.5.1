@@ -792,8 +792,8 @@ const AP_Param::GroupInfo ParametersG3::var_info[] = {
      AP_GROUPINFO("VEL30_AUTO_2", 41, ParametersG3, velocity30_auto_2, 125),//切换速度控制通道，0是SW1,1是AUX1
 
      AP_GROUPINFO("OA_DEEP_K", 42, ParametersG3, OA_deep_k, 0.01),//浅水报警回归直线判断条件
-     AP_GROUPINFO("OA_TD", 43, ParametersG3, OA_TD, 6),//浅水报警回归直线判断条件
-     AP_GROUPINFO("OA_TD_m", 44, ParametersG3, OA_TD_m, 1.2),//浅水报警回归直线判断条件
+     AP_GROUPINFO("OA_TD", 43, ParametersG3, OA_TD, 8),//浅水报警回归直线判断条件
+     AP_GROUPINFO("OA_TD_m", 44, ParametersG3, OA_TD_m, 2.1),//浅水报警回归直线判断条件
 
 
 

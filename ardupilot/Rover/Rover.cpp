@@ -384,7 +384,7 @@ void Rover::south_data(void)
     if(g3.POS_SUM!=POS_SUM_old)
     {
         POS_SUM_old=g3.POS_SUM;
-        cam_sum=g3.POS_SUM;
+        if(cam_sum!=g3.POS_SUM)cam_sum=g3.POS_SUM;
     }
 //    if(Body_number++>10)
 //    {
@@ -392,6 +392,8 @@ void Rover::south_data(void)
 //        gcs().send_text(MAV_SEVERITY_CRITICAL, "000001");
 //    }
     BD_OFF=g3.BD_south;
+//    g3.BD_south.set(8);
+
 //    AP_IOMCU::write_channel(4, seout++);
   //  iomcu.write_channel(4, seout++); //在这里输出了？
 //    hal.rcout->write(4, seout++);//能输出，但会被原本的占用！
@@ -472,7 +474,7 @@ void Rover::south_data(void)
           //解析机身号信息：@SIC,,SET,DEVICE.BEAT,OK,船体SN|船体开机时间计数（秒）\r\n
           if(strncmp((char*)hal.util->water_deep,"@SIC,,SET,DEVICE.BEAT,OK,",strlen("@SIC,,SET,DEVICE.BEAT,OK,"))==0)
           {
-              uint8_t str_sn[16]="SU20EC154100253";
+              uint8_t str_sn[16]="SU20EC154100987";
               strncpy((char*)str_sn,(char*)(hal.util->water_deep+strlen("@SIC,,SET,DEVICE.BEAT,OK,")),15);
               str_sn[15]='\0';
 
@@ -482,7 +484,7 @@ void Rover::south_data(void)
               if(hal.util->hzz_test[3]==7)
                   gcs().send_text(MAV_SEVERITY_CRITICAL, "%s",south_sn);
 
-              if((south_sn[2]=='2'||south_sn[2]=='1')&&south_sn[3]=='0')boat_model=20;//20船
+              if((south_sn[2]=='2'||south_sn[2]=='1')&&(south_sn[3]=='0'||south_sn[3]=='1'))boat_model=20;//20船
               else boat_model=0;//30船
 
           }
@@ -1033,6 +1035,7 @@ void Rover::south_data(void)
                 {
                     hal.util->deep_sum++;
                     hal.util->deep_sleep_flag=1;
+                    if(deep_water<=(g3.OA_deep_m-0.2)) hal.util->deep_sum++; //水深过低应该加快浅水避障计数
                     if(deep_water<=(g3.OA_deep_m-0.3)) hal.util->deep_sum++; //水深过低应该加快浅水避障计数
                     if(deep_water<=0.3) hal.util->deep_sum+=2; //水深过低应该加快浅水避障计数
 
@@ -1051,7 +1054,7 @@ void Rover::south_data(void)
                     if(buf_Regression_i>=buf_deep_sum-5)
                     {
                         buf_Regression_i=0;
-                        gcs().send_text(MAV_SEVERITY_CRITICAL, "k=%f",k);
+                       // gcs().send_text(MAV_SEVERITY_CRITICAL, "k=%f",k);
                         if(k>=g3.OA_deep_k)//s水深曲线
                         {
 

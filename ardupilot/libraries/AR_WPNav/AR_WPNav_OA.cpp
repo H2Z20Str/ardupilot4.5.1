@@ -36,6 +36,7 @@ extern int pointc_flag;
 extern Location old_destination,Vertical_pointc;
 int bizhang_sum=0;
 extern bool zhijietiaodian;
+extern bool south_turn;
 
 void AR_WPNav_OA::update(float dt)
 {
@@ -173,7 +174,7 @@ void AR_WPNav_OA::update(float dt)
                                 hal.util->bizhang_sum++; //避障
                             _oa_bizhang_sum_flag=false;//清除重置
                             gcs().send_text(MAV_SEVERITY_CRITICAL, "避障绕行:%d!",hal.util->bizhang_sum);
-                            gcs().send_text(MAV_SEVERITY_CRITICAL, "0:%.2f,1:%.2f,2:%.2f,3:%.2f,4:%.2f,5:%.2f,6:%.2f,7:%.2f", hal.util->ralar[0],hal.util->ralar[1],hal.util->ralar[2],hal.util->ralar[3],hal.util->ralar[4],hal.util->ralar[5],hal.util->ralar[6],hal.util->ralar[7]);
+                          //  gcs().send_text(MAV_SEVERITY_CRITICAL, "0:%.2f,1:%.2f,2:%.2f,3:%.2f,4:%.2f,5:%.2f,6:%.2f,7:%.2f", hal.util->ralar[0],hal.util->ralar[1],hal.util->ralar[2],hal.util->ralar[3],hal.util->ralar[4],hal.util->ralar[5],hal.util->ralar[6],hal.util->ralar[7]);
                             //前视避障计数输出
                            if(hal.util->hzz_test[1]==1&&hal.util->bizhang_sum!=0){
                                   gcs().send_text(MAV_SEVERITY_CRITICAL, "avoid_s=%d",hal.util->bizhang_sum);
@@ -314,6 +315,12 @@ void AR_WPNav_OA::update(float dt)
                 AR_WPNav::jump_flag=1;
                 _oa_jump_hzz=true;
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "Continuous jump point");  //连续跳点
+            }
+
+            if(south_turn==true)
+            {
+                south_turn=false;
+                _reached_destination = true;
             }
 
 

@@ -14,6 +14,7 @@
 #include "AP_Camera_MAVLink.h"
 #include "AP_Camera_MAVLinkCamV2.h"
 #include "AP_Camera_Scripting.h"
+#include <GCS_MAVLink/GCS.h>
 
 const AP_Param::GroupInfo AP_Camera::var_info[] = {
 
@@ -277,7 +278,7 @@ void AP_Camera::handle_message(mavlink_channel_t chan, const mavlink_message_t &
         }
     }
 }
-
+extern int cam_sum;
 // handle command_long mavlink messages
 MAV_RESULT AP_Camera::handle_command(const mavlink_command_int_t &packet)
 {
@@ -288,8 +289,11 @@ MAV_RESULT AP_Camera::handle_command(const mavlink_command_int_t &packet)
     case MAV_CMD_DO_DIGICAM_CONTROL:
         control(packet.param1, packet.param2, packet.param3, packet.param4, packet.x, packet.y);
         return MAV_RESULT_ACCEPTED;
-    case MAV_CMD_DO_SET_CAM_TRIGG_DIST:
+    case MAV_CMD_DO_SET_CAM_TRIGG_DIST://距离打标
         set_trigger_distance(packet.param1);
+
+        if(packet.param1<0.05&&cam_sum>1)cam_sum--;
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "part:%f",packet.param1);
         if (is_equal(packet.param3, 1.0f)) {
             take_picture();
         }
@@ -347,7 +351,7 @@ MAV_RESULT AP_Camera::handle_command(const mavlink_command_int_t &packet)
         return MAV_RESULT_DENIED;
 #endif
 
-    case MAV_CMD_IMAGE_START_CAPTURE:
+    case MAV_CMD_IMAGE_START_CAPTURE:  //时间打标
         // param1 : camera id
         // param2 : interval (in seconds)
         // param3 : total num images

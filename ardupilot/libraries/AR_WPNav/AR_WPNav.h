@@ -112,6 +112,7 @@ public:
     static const struct AP_Param::GroupInfo var_info[];
     void south_restore(const Location destination,const Location origin);//用于回到线上的操作
     void south_jump(const Location destination,const Location origin);//用于判断是否继续跳点
+    void south_turn_judge(const Location origin_old,const Location origin,const Location destination,const Location next_destination);//用于转弯时判断是否跳点
     Location jump_begin; //第一次跳点避障前的目标点
     int jump_flag=0;   //连续跳点标志
 
@@ -157,6 +158,7 @@ protected:
     AP_Float _accel_max;            // max acceleration.  If zero then attitude controller's specified max accel is used
     AP_Float _jerk_max;             // max jerk (change in acceleration).  If zero then value is same as accel_max
 
+    AP_Float _south_Offset;
     // references
     AR_AttitudeControl& _atc;       // rover attitude control library
     AR_PosControl &_pos_control;    // rover position control library

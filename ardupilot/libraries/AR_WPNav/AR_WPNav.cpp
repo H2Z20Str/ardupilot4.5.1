@@ -20,7 +20,7 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_InternalError/AP_InternalError.h>
 #include <math.h>
-
+#include <AP_Mission/AP_Mission.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <stdio.h>
 #endif
@@ -85,6 +85,9 @@ const AP_Param::GroupInfo AR_WPNav::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("JERK", 10, AR_WPNav, _jerk_max, 0),
 
+    AP_GROUPINFO("hzz_offset", 11, AR_WPNav, _south_Offset, 10),
+
+
     AP_GROUPEND
 };
 
@@ -95,10 +98,11 @@ AR_WPNav::AR_WPNav(AR_AttitudeControl& atc, AR_PosControl &pos_control) :
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
-float speed_old=0;
-extern Location hzz_old,hzz_old_next,hzz_origin;
-extern bool _oa_jump_hzz;
-extern bool zhijietiaodian;
+float speed_old=0; //速度更新
+extern Location hzz_old,hzz_origin;//上一个航点目标，上一个原点
+extern bool _oa_jump_hzz; //跳点标志
+extern bool zhijietiaodian; //避障直接跳点标志（大型障碍物）
+extern bool _oa_jump_tip; //跳点提示
 // initialise waypoint controller.  speed_max should be set to the maximum speed in m/s (or left at zero to use the default speed)
 void AR_WPNav::init(float speed_max)
 {
@@ -150,14 +154,15 @@ void AR_WPNav::init(float speed_max)
     jump_flag=0;
     _oa_jump_hzz=false;
     zhijietiaodian=false;
+    _oa_jump_tip=false;
 }
 
 //extern int wp_sum;
-float south_distance=0;
-float south_radius=0,current_time;
+float south_distance=0; //航点距离，用于转弯减速
+float south_radius=0,current_time; //转弯半径，剩余时间
 Location Vertical_pointc,old_destination,current_old_origin; //垂直点坐标
-int pointc_flag=0;
-extern bool _oa_jump_tip;
+int pointc_flag=0;//垂直点标志
+
 
 // update navigation
 void AR_WPNav::update(float dt)
@@ -383,7 +388,7 @@ void AR_WPNav::south_restore(const Location destination,const Location origin)
     //计算垂直点坐标
 
     //三角函数比例：垂直点到目标点的距离/原点到目标点的距离
-    float k =L1/_origin_to_destination;
+    double k =L1/_origin_to_destination;
 
     Vertical_pointc.lat=destination.lat-k*(destination.lat-origin.lat);
     Vertical_pointc.lng=destination.lng-k*(destination.lng-origin.lng);
@@ -410,6 +415,71 @@ void AR_WPNav::south_restore(const Location destination,const Location origin)
 //        if(set_desired_location(Vertical_pointc))
 }
 
+//航线间距过小直接走下一个航点，用于在小型航线间距时加快转弯
+bool south_turn=false;
+//上一个原点，本次的原点，本次的目标点
+void AR_WPNav::south_turn_judge(const Location origin_old,const Location origin,const Location destination,const Location next_destination)
+{
+//    //上个原点到本次原点的方向
+//    float origin_bearing_cd = origin.get_bearing_to(destination);
+//
+//    //本次原点到目标点的方向角
+//    float originold_bearing_cd = origin_old.get_bearing_to(origin);
+//
+    //下一个航点
+//    AP_Mission::Mission_Command next_cmd;
+//
+//   // AP_Mission::get_next_nav_cmd(2, next_cmd);
+////    if (!AP_Mission::get_next_nav_cmd(1,next_cmd)) {
+////        // single destination
+////    }
+//    Location next_cmdloc = next_cmd.content.location;
+//  //  next_cmdloc.sanitize(cmdloc);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "_dt=%d,_dg=%d",next_cmdloc.lat,next_cmdloc.lng);
+
+   // float angle=origin_bearing_cd-originold_bearing_cd;
+    float angle= get_corner_angle(origin_old, origin, destination);//补角，不是内角
+//     gcs().send_text(MAV_SEVERITY_CRITICAL, "angle=%f",angle);
+    if(fabsf(angle)<65) return; //钝角情况
+    //本次原点到目标点的距离
+    float _origin_to_destination = origin.get_distance(destination);
+    //只要原点到下个航点的间距小于5就直接跳点？
+
+
+
+
+
+
+    if(hal.util->hzz_test[2]==3) //往航线内侧重新设置一个航点，辅助船更好的回到线上
+    {
+        if(next_destination.lat!=0&&next_destination.lng!=0) //存在下一个航点
+        {
+            //将本次目标点往下一个目标点方向偏移10m
+            //计算本次目标点到下一个目标点的距离
+            float _next_to_destination = destination.get_distance(next_destination);
+
+            //三角函数比例：偏移距离/目标点到下一个目标点的距离
+            if(_next_to_destination<_south_Offset) return;
+            double k =_next_to_destination/_south_Offset;
+
+            Location Offset_Point; //偏移点
+            Offset_Point.lat=destination.lat+(next_destination.lat-destination.lat)/k;
+            Offset_Point.lng=destination.lng+(next_destination.lng-destination.lng)/k;
+
+            if(_origin_to_destination<9)
+            {
+                if(set_desired_location_expect_fast_update(Offset_Point))
+                {
+                   // gcs().send_text(MAV_SEVERITY_CRITICAL, "_dt=%d,_dg=%d",Offset_Point.lat,Offset_Point.lng);
+                }
+            }
+        }
+    }
+    else
+        if(_origin_to_destination<9)south_turn=true;//跳点
+
+}
+
 //extern bool _oa_active_hzz;
 bool _oa_restoration_hzz=false;
 bool AR_WPNav::set_desired_location(const Location& destination, Location next_destination)
@@ -434,6 +504,7 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
     }
 
     //如果已设置起点和终点，则为true，_reached_destination为true 4.23
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "222 _dt=%d,_dg=%d",next_destination.lat,next_destination.lng);
      if (is_active() && _orig_and_dest_valid && _reached_destination) { //如果已经标记了已抵达航点则更新原点
          _origin = _destination; //可行
 
@@ -476,6 +547,8 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
     if(pointc_flag==3)pointc_flag=0;
     if(jump_flag==3)jump_flag=0;
 
+
+
     if(_oa_jump_hzz) //跳点避障
     {
         //跳点避障后判断一下是否需要再次跳点
@@ -502,6 +575,11 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
     _destination = destination;
     _orig_and_dest_valid = true;
     _reached_destination = false;
+
+
+    if(_oa_restoration_hzz!=true&&_oa_jump_hzz!=true&&pointc_flag==0&&jump_flag==0) //避障及跳点避障不启用该功能,非垂直点
+        south_turn_judge(hzz_origin,_origin,_destination,next_destination);
+
 
 //    if(pointc_flag)
 //    {

@@ -106,7 +106,7 @@ void GCS_MAVLINK_Rover::send_nav_controller_output() const
     }
 
     const Mode *control_mode = rover.control_mode;
-
+   // gcs().send_text(MAV_SEVERITY_CRITICAL, "d:%f,n:%f",MIN(control_mode->get_distance_to_destination(), UINT16_MAX) ,control_mode->wp_bearing());
     mavlink_msg_nav_controller_output_send(
         chan,
         0,  // roll

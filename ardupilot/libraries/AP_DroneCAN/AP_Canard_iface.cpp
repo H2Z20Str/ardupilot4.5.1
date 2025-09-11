@@ -330,7 +330,7 @@ void CanardInterface::update_rx_protocol_stats(int16_t res)
 
 int gMR72code=0;
 int gMR72Dist[10];
-int MZBDist[8];
+float MZBDist[8];
 
 typedef struct { // byte description
 uint8_t Objects_ID:8; //目标ID

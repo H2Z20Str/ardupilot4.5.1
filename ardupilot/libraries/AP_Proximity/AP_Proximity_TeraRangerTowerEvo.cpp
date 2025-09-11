@@ -91,12 +91,12 @@ void AP_Proximity_TeraRangerTowerEvo::set_mode(const uint8_t *c, int length)
 //避障数据解析
 uint16_t mr72_average=UINT16_VALUE(0xFF,  0xFF);
 uint8_t mr72_s=0;
-extern int MZBDist[8];
+extern float MZBDist[8];
 extern char Manual_3;
 extern bool _oa_bizhang_sum_flag;
 bool zhijietiaodian=false;
-int zjtd=6;
-float zjtdm=0;
+int zjtd=6;  //判断条件 oa_td_d
+float zjtdm=0; //延展距离 oa_td_m
 // check for replies from sensor, returns true if at least one message was processed
 bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
 {
@@ -208,12 +208,12 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                     for(int i=0;i<8;i++)
                     {
                         hal.util->ralar[i]=UINT16_VALUE(hal.util->mr72_buff2[2+i*2],  hal.util->mr72_buff2[3+i*2])/1000.0;
-                        if( (hal.util->ralar[0]>0.1)&&hal.util->ralar[i]<(oa1->get_margin()+zjtdm))bz_sflag++;
+                        if( (hal.util->ralar[0]>0.1)&&hal.util->ralar[i]<(oa1->get_margin()*zjtdm))bz_sflag++;
                     }
 
                     if(bz_sflag>3&&oa_sleep==0)
                       {
-                            gcs().send_text(MAV_SEVERITY_CRITICAL, "bz_sflag %d",bz_sflag); //
+                          //  gcs().send_text(MAV_SEVERITY_CRITICAL, "bz_sflag %d",bz_sflag); //
                            zhijietiaodian=true; //四面楚歌直接跳点
                       }
 
@@ -349,7 +349,7 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
                 }
 
                 message_count++;  
-               memset(hal.util->MR72_can,0,10);       
+               memset(hal.util->MR72_can,0,sizeof(hal.util->MR72_can));
 
    }
    else if(hal.util->radar_type==2) //can 莫之比雷达
@@ -362,15 +362,16 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
        for(int i=0;i<8;i++)
        {
            hal.util->ralar[i]=MZBDist[i];
-           if(MZBDist[i]>0.1&& MZBDist[i]<(oa1->get_margin()+zjtdm)) bz_sflag++;
+           if(MZBDist[i]>0.01&& MZBDist[i]<(oa1->get_margin()*zjtdm)) bz_sflag++;
        }
 
        if(bz_sflag>=zjtd&&oa_sleep==0) //跳点后不触发
          {
-               gcs().send_text(MAV_SEVERITY_CRITICAL, "bz_sflag %d",bz_sflag); //
+             //  gcs().send_text(MAV_SEVERITY_CRITICAL, "bz_sflag %d",bz_sflag); //
               //if(hal.util->ralar[0]<(oa1->get_margin()+zjtdm+1))
                   zhijietiaodian=true; //四面楚歌直接跳点
          }
+    //   gcs().send_text(MAV_SEVERITY_CRITICAL, "0:%.2f,1:%.2f,2:%.2f,3:%.2f,4:%.2f,5:%.2f,6:%.2f,7:%.2f", hal.util->ralar[0],hal.util->ralar[1],hal.util->ralar[2],hal.util->ralar[3],hal.util->ralar[4],hal.util->ralar[5],hal.util->ralar[6],hal.util->ralar[7]);
 
        if((hal.util->ralar[0]>0.1)&&(hal.util->ralar[0]< oa1->get_margin())&&(hal.util->mr72_switch!=0)) //正前避障数据小于避障距离，且在避障打开的情况
        {
@@ -430,7 +431,7 @@ bool AP_Proximity_TeraRangerTowerEvo::read_sensor_data()
 
                 message_count++; 
                 hal.util->mzb_DistLong=0;//清零
-                memset(MZBDist,0,10);
+                memset(MZBDist,0,sizeof(MZBDist));
    }
 
 

@@ -764,7 +764,7 @@ void GCS_MAVLINK::send_mission_current(const class AP_Mission &mission, uint16_t
 #else
     const uint8_t mission_mode = 0;
 #endif
-
+   // gcs().send_text(MAV_SEVERITY_CRITICAL, "nowD:%d",seq);
     mavlink_msg_mission_current_send(
         chan,
         seq,
@@ -1880,7 +1880,7 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
 uint8_t c_old=0,water_flag=0,mr72_flag=0;
 uint8_t water_n=0,mr72_n=0;
 //uint8_t SOUTH_SNFLAG=0,SOUTH_sum=0,snsum=0;
-uint8_t south_sn[16]="SU20EC154100253";
+uint8_t south_sn[16]="SU20EC154100987";
 
 void
 GCS_MAVLINK::update_receive(uint32_t max_time_us)
@@ -3076,7 +3076,22 @@ void GCS_MAVLINK::send_heartbeat() const
          //   gcs().send_text(MAV_SEVERITY_CRITICAL,"不输出：%d",chan);
             return;
        }
+    if(chan==2)
+    {
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\n\r\n");
+        hal.serial(2)->printf("\r\n\r\n");//串口输出数据
+      //  hal.serial(chan)->printf("\r\n\r\n");//串口输出数据 仿真用
+        for(int i;i<1000;i++);//延时一下
+    }
     mavlink_msg_south_sn_send(chan,south_sn);
+
+    if(chan==2)
+        {
+            for(int i;i<1000;i++);//延时一下
+            //gcs().send_text(MAV_SEVERITY_CRITICAL, "\r\n\r\n");
+            hal.serial(2)->printf("\r\n\r\n");//串口输出数据
+           // hal.serial(chan)->printf("\r\n\r\n");//串口输出数据 仿真用
+        }
     mavlink_msg_heartbeat_send(
         chan,
         gcs().frame_type(),
@@ -7040,7 +7055,7 @@ void GCS_MAVLINK::send_high_latency2() const
     }
 
     //send_text(MAV_SEVERITY_INFO, "Yaw: %u", (((uint16_t)ahrs.yaw_sensor / 100) % 360));
-
+ //   gcs().send_text(MAV_SEVERITY_CRITICAL, "d:%d,n:%d",high_latency_tgt_dist() ,current_waypoint);
     mavlink_msg_high_latency2_send(chan, 
         AP_HAL::millis(), //[ms] Timestamp (milliseconds since boot or Unix epoch)
         gcs().frame_type(), // Type of the MAV (quadrotor, helicopter, etc.)
